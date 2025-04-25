@@ -1,66 +1,103 @@
 <?php
-require_once '../includes/db.php';
-require_once '../includes/functions.php';
-require_once '../includes/header.php';
+// ابدأ الجلسة بأعلى الملف
+session_start();
 
-// التحقق من صلاحيات المشرف
+// تضمين ملف الاتصال بقاعدة البيانات
+require_once __DIR__ . '/includes/db.php';
+// تضمين دوال مساعدة (formatDate() وغيره)
+require_once __DIR__ . '/includes/functions.php';
+// تضمين الهيدر العام (القائمة العلوية، الروابط…)
+require_once __DIR__ . '/includes/header.php';
+
+// ------------------------------------------------------------------
+//    التحقق من صلاحيات المشرف
+// ------------------------------------------------------------------
 if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'admin') {
-    header("Location: ../login.php");
-    exit();
+    // اذا لم يكن مسجل دخول أو ليس أدمين، أعد التوجيه لصفحة تسجيل الدخول
+    header("Location: login.php");
+    exit;
 }
 
-// حذف مستخدم إذا تم الضغط على زر الحذف
-if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
-    $delete_id = $_GET['delete'];
+// ------------------------------------------------------------------
+//    حذف مستخدم (عند الطلب عبر الرابط ?delete=ID)
+// ------------------------------------------------------------------
+$success = '';
+$error   = '';
 
-    // لا تسمح بحذف المستخدم نفسه
-    if ($delete_id != $_SESSION['user_id']) {
+if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
+    $delete_id = (int) $_GET['delete'];
+
+    // لا تسمح بحذف نفسك
+    if ($delete_id !== (int) $_SESSION['user_id']) {
         $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
         $stmt->execute([$delete_id]);
-        $success = "تم حذف المستخدم بنجاح.";
+        $success = "✅ تم حذف المستخدم بنجاح.";
     } else {
-        $error = "لا يمكنك حذف نفسك.";
+        $error = "⚠️ لا يمكنك حذف نفسك.";
     }
 }
 
-// جلب المستخدمين
-$stmt = $pdo->prepare("SELECT id, username, email, role, created_at FROM users ORDER BY created_at DESC");
-$stmt->execute();
+// ------------------------------------------------------------------
+//    جلب قائمة المستخدمين للعرض
+// ------------------------------------------------------------------
+$stmt = $pdo->query("
+    SELECT id, username, email, role, created_at
+    FROM users
+    ORDER BY created_at DESC
+");
 $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
-<h2>إدارة المستخدمين</h2>
+<div class="container">
+    <h2>إدارة المستخدمين</h2>
+
+    <?php
+    // عرض رسائل النجاح أو الخطأ
+    if ($success) {
+        echo "<div class=\"alert alert-success\">$success</div>";
+    }
+    if ($error) {
+        echo "<div class=\"alert alert-danger\">$error</div>";
+    }
+    ?>
+
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>الاسم</th>
+                <th>البريد الإلكتروني</th>
+                <th>الصلاحية</th>
+                <th>تاريخ الإنشاء</th>
+                <th>إجراء</th>
+            </tr>
+        </thead>
+        <tbody>
+        <?php foreach ($users as $u): ?>
+            <tr>
+                <td><?= $u['id'] ?></td>
+                <td><?= htmlspecialchars($u['username'], ENT_QUOTES) ?></td>
+                <td><?= htmlspecialchars($u['email'], ENT_QUOTES) ?></td>
+                <td><?= htmlspecialchars($u['role'], ENT_QUOTES) ?></td>
+                <td><?= formatDate($u['created_at']) ?></td>
+                <td>
+                    <?php if ($u['id'] !== (int) $_SESSION['user_id']): ?>
+                        <a href="index.php?delete=<?= $u['id'] ?>"
+                           onclick="return confirm('هل أنت متأكد من حذف هذا المستخدم؟');"
+                           class="btn btn-sm btn-danger">
+                           حذف
+                        </a>
+                    <?php else: ?>
+                        <span class="text-muted">لا يمكن</span>
+                    <?php endif; ?>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
 
 <?php
-if (!empty($success)) showMessage("success", $success);
-if (!empty($error)) showMessage("danger", $error);
+// تضمين الفوتر العام
+require_once __DIR__ . '/includes/footer.php';
 ?>
-
-<table border="1" cellpadding="10" cellspacing="0" width="100%">
-    <tr>
-        <th>الرقم</th>
-        <th>الاسم</th>
-        <th>البريد الإلكتروني</th>
-        <th>الصلاحية</th>
-        <th>تاريخ الإنشاء</th>
-        <th>الإجراء</th>
-    </tr>
-    <?php foreach ($users as $user): ?>
-        <tr>
-            <td><?= $user['id']; ?></td>
-            <td><?= htmlspecialchars($user['username']); ?></td>
-            <td><?= htmlspecialchars($user['email']); ?></td>
-            <td><?= $user['role']; ?></td>
-            <td><?= formatDate($user['created_at']); ?></td>
-            <td>
-                <?php if ($user['id'] != $_SESSION['user_id']): ?>
-                    <a href="users.php?delete=<?= $user['id']; ?>" onclick="return confirm('هل أنت متأكد أنك تريد حذف هذا المستخدم؟');">🗑️ حذف</a>
-                <?php else: ?>
-                    <span style="color: gray;">لا يمكن الحذف</span>
-                <?php endif; ?>
-            </td>
-        </tr>
-    <?php endforeach; ?>
-</table>
-
-<?php require_once '../includes/footer.php'; ?>
