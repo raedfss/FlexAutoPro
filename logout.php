@@ -3,11 +3,13 @@
 // FlexAuto - Logout Script
 // ==========================
 
-session_start();          // بدء الجلسة الحالية
-session_unset();          // حذف جميع متغيرات الجلسة
-session_destroy();        // تدمير الجلسة نهائيًا
+session_start();
+session_unset();
+session_destroy();
 
-// إعادة التوجيه إلى صفحة تسجيل الدخول
+// إلغاء التخزين المؤقت للصفحة
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Expires: Sat, 26 Jul 1997 05:00:00 GMT");
 header("Location: login.php");
 exit;
 ?>

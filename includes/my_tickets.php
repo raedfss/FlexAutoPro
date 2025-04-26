@@ -1,33 +1,26 @@
-mysqli_prepare($conn, ...)
-``>
-
-وهذا هو السبب في الخطأ:  
-> `$conn` غير موجود أصلًا لأن الاتصال تم باستخدام `$pdo` من PDO وليس `$conn` من MySQLi.
-
----
-
-## ✅ الحل النهائي:
-### سنُعيد كتابة `my_tickets.php` بالكامل ليتوافق مع **PDO**.
-
----
-
-## 🔧 النسخة المتوافقة مع PDO:
-
-```php
 <?php
+// FlexAutoPro - my_tickets.php
+
+// بدء الجلسة والتحقق من تسجيل الدخول
 session_start();
 if (!isset($_SESSION['email'])) {
     header("Location: ../login.php");
     exit;
 }
 
-require_once 'db.php';
+// استدعاء الاتصال بقاعدة البيانات
+require_once __DIR__ . '/../includes/db.php';
+
+// جلب التذاكر الخاصة بالمستخدم
 $username = $_SESSION['username'];
 
-// جلب التذاكر
-$stmt = $pdo->prepare("SELECT * FROM tickets WHERE username = ? ORDER BY created_at DESC");
-$stmt->execute([$username]);
-$tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+try {
+    $stmt = $pdo->prepare("SELECT * FROM tickets WHERE username = :username ORDER BY created_at DESC");
+    $stmt->execute(['username' => $username]);
+    $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    die("Database error: " . $e->getMessage());
+}
 ?>
 
 <!DOCTYPE html>
@@ -36,8 +29,7 @@ $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <title>تذاكري - FlexAuto</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, sans-serif;
@@ -182,37 +174,36 @@ $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="container">
         <h1>تذاكري السابقة</h1>
 
-        <?php if (count($tickets) > 0): ?>
-            <?php foreach ($tickets as $row): ?>
+        <?php if (!empty($tickets)): ?>
+            <?php foreach ($tickets as $ticket): ?>
                 <div class="ticket-box">
-                    <p><strong>رقم التذكرة:</strong> <span class="ticket-id">FLEX-<?= $row['id'] ?></span></p>
-                    <p><strong>نوع الخدمة:</strong> <?= htmlspecialchars($row['service_type']) ?></p>
-                    <p><strong>نوع السيارة:</strong> <?= htmlspecialchars($row['car_type']) ?></p>
-                    <p><strong>رقم الشاسيه:</strong> <?= htmlspecialchars($row['chassis']) ?></p>
-                    <p><strong>تاريخ الإرسال:</strong> <?= date('Y/m/d - h:i A', strtotime($row['created_at'])) ?></p>
+                    <p><strong>رقم التذكرة:</strong> <span class="ticket-id">FLEX-<?= htmlspecialchars($ticket['id']) ?></span></p>
+                    <p><strong>نوع الخدمة:</strong> <?= htmlspecialchars($ticket['service_type']) ?></p>
+                    <p><strong>نوع السيارة:</strong> <?= htmlspecialchars($ticket['car_type']) ?></p>
+                    <p><strong>رقم الشاسيه:</strong> <?= htmlspecialchars($ticket['chassis']) ?></p>
+                    <p><strong>تاريخ الإرسال:</strong> <?= date('Y/m/d - h:i A', strtotime($ticket['created_at'])) ?></p>
                     <p><strong>الحالة:</strong>
-                        <span class="ticket-status <?= ($row['is_seen'] == 1 ? 'status-reviewed' : 'status-pending') ?>">
-                            <?= ($row['is_seen'] == 1 ? 'تمت المراجعة' : 'قيد المراجعة') ?>
+                        <span class="ticket-status <?= ($ticket['is_seen'] == 1) ? 'status-reviewed' : 'status-pending' ?>">
+                            <?= ($ticket['is_seen'] == 1) ? 'تمت المراجعة' : 'قيد المراجعة' ?>
                         </span>
                     </p>
-
                     <div class="buttons">
-                        <a href="../ticket_details.php?id=<?= $row['id'] ?>" class="btn btn-primary">
+                        <a href="../ticket_details.php?id=<?= $ticket['id'] ?>" class="btn btn-primary">
                             <i class="fas fa-eye"></i> عرض التفاصيل
                         </a>
-                        <button class="btn btn-secondary" onclick="window.print()">
+                        <button onclick="window.print()" class="btn btn-secondary">
                             <i class="fas fa-print"></i> طباعة
                         </button>
-                        <?php if ($row['is_seen'] == 0): ?>
-                        <a href="../edit_ticket.php?id=<?= $row['id'] ?>" class="btn btn-warning">
-                            <i class="fas fa-edit"></i> تعديل التذكرة
-                        </a>
+                        <?php if ($ticket['is_seen'] == 0): ?>
+                            <a href="../edit_ticket.php?id=<?= $ticket['id'] ?>" class="btn btn-warning">
+                                <i class="fas fa-edit"></i> تعديل التذكرة
+                            </a>
                         <?php endif; ?>
                     </div>
                 </div>
             <?php endforeach; ?>
         <?php else: ?>
-            <p style="text-align: center; color: #a0d0ff;">لا توجد تذاكر محفوظة.</p>
+            <p class="text-center" style="color: #a0d0ff;">لا توجد تذاكر محفوظة.</p>
         <?php endif; ?>
     </div>
 </main>

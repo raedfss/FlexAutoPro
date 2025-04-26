@@ -1,23 +1,37 @@
 <?php
-// includes/functions.php
+// FlexAutoPro - includes/functions.php
+// دوال مساعدة عامة للمشروع
 
-// دالة: تحويل التاريخ لصيغة عربية (مثال)
+// دالة تنسيق التاريخ بطريقة جميلة
 function formatDate($datetime) {
-    return date("Y-m-d H:i", strtotime($datetime));
+    if (!$datetime) {
+        return '';
+    }
+
+    // التأكد من أن القيمة قابلة للقراءة
+    try {
+        $date = new DateTime($datetime);
+        return $date->format('Y-m-d H:i');
+    } catch (Exception $e) {
+        return '';
+    }
 }
 
-// دالة: عرض رسالة تنبيه (Bootstrap أو عادي)
-function showMessage($type, $message) {
-    echo "<div class='alert alert-$type'>$message</div>";
+// دالة تنظيف إدخالات المستخدم (اختياري إضافي لزيادة الأمان)
+function sanitizeInput($data) {
+    return htmlspecialchars(strip_tags(trim($data)));
 }
 
-// دالة: التحقق من كون المستخدم مشرف
+// دالة عرض رسالة تنبيه (Bootstrap Alert)
+function displayAlert($message, $type = 'success') {
+    if (!$message) return '';
+    return '<div class="alert alert-' . htmlspecialchars($type) . ' text-center" role="alert">'
+         . htmlspecialchars($message)
+         . '</div>';
+}
+
+// دالة التحقق مما إذا كان المستخدم Admin
 function isAdmin() {
     return (isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin');
 }
-
-// دالة: توليد كود عشوائي (مثلاً لتفعيل أو رقم طلب)
-function generateCode($length = 8) {
-    return substr(str_shuffle('ABCDEFGHJKLMNPQRSTUVWXYZ23456789'), 0, $length);
-}
-
+?>

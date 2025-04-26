@@ -1,23 +1,47 @@
 <?php
 session_start();
 if (!isset($_SESSION['email'])) {
-    header("Location: ../login.php");
+    header("Location: login.php");
     exit;
 }
 
-// استيراد ملف قاعدة البيانات الذي يستخدم PDO
-require_once 'db.php';
+require_once 'includes/db.php';
 
+if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
+    die("معرف التذكرة غير صالح.");
+}
+
+$ticket_id = intval($_GET['id']);
 $username = $_SESSION['username'];
 
-// استخدام PDO بدلاً من mysqli
-try {
-    // استعلام للحصول على تذاكر المستخدم باستخدام PDO
-    $stmt = $pdo->prepare("SELECT * FROM tickets WHERE username = ? ORDER BY created_at DESC");
-    $stmt->execute([$username]);
-    $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    die("خطأ في الاتصال بقاعدة البيانات: " . $e->getMessage());
+// جلب بيانات التذكرة
+$stmt = $pdo->prepare("SELECT * FROM tickets WHERE id = ? AND username = ?");
+$stmt->execute([$ticket_id, $username]);
+$ticket = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$ticket) {
+    die("لم يتم العثور على التذكرة.");
+}
+
+// عند إرسال النموذج
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $service_type = trim($_POST['service_type']);
+    $car_type = trim($_POST['car_type']);
+    $chassis = trim($_POST['chassis']);
+    $additional_info = trim($_POST['additional_info']);
+
+    if ($service_type && $car_type && $chassis) {
+        $update_stmt = $pdo->prepare("
+            UPDATE tickets 
+            SET service_type = ?, car_type = ?, chassis = ?, additional_info = ? 
+            WHERE id = ? AND username = ?
+        ");
+        $update_stmt->execute([$service_type, $car_type, $chassis, $additional_info, $ticket_id, $username]);
+        header("Location: my_tickets.php?success=1");
+        exit;
+    } else {
+        $error = "جميع الحقول مطلوبة باستثناء الملاحظات.";
+    }
 }
 ?>
 
@@ -25,9 +49,10 @@ try {
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تذاكري | FlexAuto</title>
+    <title>تعديل التذكرة | FlexAuto</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, sans-serif;
@@ -64,7 +89,7 @@ try {
 
         main {
             padding: 30px 20px;
-            max-width: 1000px;
+            max-width: 800px;
             margin: auto;
         }
 
@@ -82,37 +107,43 @@ try {
             margin-bottom: 30px;
         }
 
-        .tickets-table {
+        form label {
+            display: block;
+            margin-bottom: 6px;
+            color: #a0d0ff;
+        }
+
+        form input, form textarea {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: none;
+            border-radius: 10px;
+            background-color: rgba(30, 35, 50, 0.8);
+            color: white;
+            font-size: 16px;
         }
 
-        .tickets-table th, .tickets-table td {
-            padding: 12px 15px;
-            text-align: right;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        form textarea {
+            resize: vertical;
         }
 
-        .tickets-table th {
-            background-color: rgba(0, 0, 0, 0.3);
-            color: #00ffff;
-        }
-
-        .tickets-table tr:hover {
-            background-color: rgba(0, 255, 255, 0.05);
+        .buttons {
+            margin-top: 25px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
         }
 
         .btn {
-            padding: 8px 15px;
+            text-decoration: none;
+            padding: 12px 25px;
             border-radius: 30px;
             font-weight: bold;
-            border: none;
-            cursor: pointer;
             transition: 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-            font-size: 14px;
+            cursor: pointer;
+            border: none;
         }
 
         .btn-primary {
@@ -120,31 +151,10 @@ try {
             color: white;
         }
 
-        .btn-new {
-            background: linear-gradient(135deg, #00c853, #00e676);
-            color: white;
-            font-size: 16px;
-            padding: 12px 25px;
-            margin-bottom: 20px;
-        }
-
-        .status-new {
-            color: #00e676;
-        }
-
-        .status-in-progress {
-            color: #ffeb3b;
-        }
-
-        .status-completed {
+        .btn-secondary {
+            background: rgba(30, 35, 50, 0.8);
             color: #00ffff;
-        }
-
-        .no-tickets {
-            text-align: center;
-            color: #a0d0ff;
-            font-size: 18px;
-            margin: 30px 0;
+            border: 1px solid rgba(0, 255, 255, 0.3);
         }
 
         footer {
@@ -161,66 +171,51 @@ try {
             color: #00ffff;
             margin-bottom: 10px;
         }
+
+        @media (max-width: 768px) {
+            .btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>
 
 <div class="svg-background">
-    <embed type="image/svg+xml" src="../admin/admin_background.svg" class="svg-object">
+    <embed type="image/svg+xml" src="admin/admin_background.svg" class="svg-object">
 </div>
 
-<header>FlexAuto - تذاكري</header>
+<header>FlexAuto - تعديل التذكرة</header>
 
 <main>
     <div class="container">
-        <h1>تذاكر الخدمة الخاصة بك</h1>
-        
-        <div style="text-align: center;">
-            <a href="../new_ticket.php" class="btn btn-new"><i class="fas fa-plus-circle"></i> إنشاء تذكرة جديدة</a>
-        </div>
+        <h1>تعديل بيانات التذكرة</h1>
 
-        <?php if (count($tickets) > 0): ?>
-            <table class="tickets-table">
-                <thead>
-                    <tr>
-                        <th>رقم التذكرة</th>
-                        <th>نوع الخدمة</th>
-                        <th>نوع السيارة</th>
-                        <th>تاريخ الإنشاء</th>
-                        <th>الحالة</th>
-                        <th>الإجراءات</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($tickets as $ticket): ?>
-                        <tr>
-                            <td>FLEX-<?= $ticket['id'] ?></td>
-                            <td><?= htmlspecialchars($ticket['service_type']) ?></td>
-                            <td><?= htmlspecialchars($ticket['car_type']) ?></td>
-                            <td><?= date('Y-m-d H:i', strtotime($ticket['created_at'])) ?></td>
-                            <td>
-                                <?php 
-                                if ($ticket['status'] == 'new'): ?>
-                                    <span class="status-new">جديدة</span>
-                                <?php elseif ($ticket['status'] == 'in_progress'): ?>
-                                    <span class="status-in-progress">قيد المعالجة</span>
-                                <?php elseif ($ticket['status'] == 'completed'): ?>
-                                    <span class="status-completed">مكتملة</span>
-                                <?php endif; ?>
-                            </td>
-                            <td>
-                                <a href="../ticket_details.php?id=<?= $ticket['id'] ?>" class="btn btn-primary"><i class="fas fa-eye"></i> عرض</a>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </tbody>
-            </table>
-        <?php else: ?>
-            <div class="no-tickets">
-                <p>ليس لديك أي تذاكر خدمة حتى الآن.</p>
-                <p>يمكنك إنشاء تذكرة جديدة للحصول على المساعدة.</p>
+        <?php if (isset($error)): ?>
+            <div style="background-color: #ff4d4d; padding: 10px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+                <?= htmlspecialchars($error) ?>
             </div>
         <?php endif; ?>
+
+        <form method="post">
+            <label for="service_type">نوع الخدمة</label>
+            <input type="text" id="service_type" name="service_type" value="<?= htmlspecialchars($ticket['service_type']) ?>" required>
+
+            <label for="car_type">نوع السيارة</label>
+            <input type="text" id="car_type" name="car_type" value="<?= htmlspecialchars($ticket['car_type']) ?>" required>
+
+            <label for="chassis">رقم الشاسيه</label>
+            <input type="text" id="chassis" name="chassis" value="<?= htmlspecialchars($ticket['chassis']) ?>" required>
+
+            <label for="additional_info">ملاحظات إضافية</label>
+            <textarea id="additional_info" name="additional_info" rows="4"><?= htmlspecialchars($ticket['additional_info']) ?></textarea>
+
+            <div class="buttons">
+                <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> حفظ التعديلات</button>
+                <a href="my_tickets.php" class="btn btn-secondary"><i class="fas fa-arrow-right"></i> رجوع</a>
+            </div>
+        </form>
     </div>
 </main>
 

@@ -15,22 +15,22 @@ if (!isset($pageTitle)) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="FlexAuto - خدمات برمجة السيارات وحلول تقنية متقدمة">
-    <title><?php echo $pageTitle; ?></title>
-    
+    <title><?php echo htmlspecialchars($pageTitle); ?></title>
+
     <!-- Bootstrap RTL -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.rtl.min.css">
-    
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Google Fonts - Cairo for Arabic -->
+
+    <!-- Google Fonts - Cairo -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="../assets/css/style.css">
-    
+
     <style>
         :root {
             --primary: #004080;
@@ -40,7 +40,6 @@ if (!isset($pageTitle)) {
             --light: #f8f9fa;
             --dark: #212529;
         }
-        
         body {
             font-family: 'Cairo', 'Tahoma', sans-serif;
             background-color: #f1f5f9;
@@ -51,8 +50,7 @@ if (!isset($pageTitle)) {
             display: flex;
             flex-direction: column;
         }
-        
-        /* ----- الهيدر ----- */
+        /* الهيدر */
         .site-header {
             background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
             color: white;
@@ -60,7 +58,6 @@ if (!isset($pageTitle)) {
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             position: relative;
         }
-        
         .header-container {
             width: 90%;
             max-width: 1200px;
@@ -69,26 +66,22 @@ if (!isset($pageTitle)) {
             flex-direction: column;
             align-items: center;
         }
-        
         .logo-container {
             display: flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 15px;
         }
-        
         .logo-icon {
             font-size: 32px;
             margin-left: 10px;
             color: var(--secondary);
         }
-        
         .logo-text {
             font-size: 24px;
             font-weight: 700;
             color: white;
         }
-        
         .site-title {
             margin: 0;
             font-size: 32px;
@@ -96,20 +89,16 @@ if (!isset($pageTitle)) {
             font-weight: 700;
             color: white;
         }
-        
         .site-subtitle {
             font-size: 16px;
             color: rgba(255, 255, 255, 0.8);
             margin-top: 5px;
             text-align: center;
         }
-        
-        /* ----- القائمة ----- */
         .main-nav {
             width: 100%;
             margin-top: 10px;
         }
-        
         .nav-list {
             list-style: none;
             padding: 0;
@@ -118,11 +107,9 @@ if (!isset($pageTitle)) {
             justify-content: center;
             flex-wrap: wrap;
         }
-        
         .nav-item {
             margin: 5px 10px;
         }
-        
         .nav-link {
             color: white;
             text-decoration: none;
@@ -134,29 +121,23 @@ if (!isset($pageTitle)) {
             gap: 6px;
             font-weight: 500;
         }
-        
         .nav-link:hover {
             background-color: rgba(255, 255, 255, 0.2);
             transform: translateY(-2px);
         }
-        
         .nav-link.active {
             background-color: rgba(255, 255, 255, 0.2);
             font-weight: 600;
         }
-        
         .nav-icon {
             font-size: 16px;
         }
-        
         .user-name {
             background-color: rgba(255, 255, 255, 0.2);
             padding: 5px 12px;
             border-radius: 20px;
             font-weight: 600;
         }
-        
-        /* ----- المحتوى الرئيسي ----- */
         .main-content {
             flex: 1;
             width: 90%;
@@ -164,52 +145,40 @@ if (!isset($pageTitle)) {
             margin: 30px auto;
             padding-bottom: 30px;
         }
-        
-        /* ----- الزر ----- */
         .btn-primary {
             background-color: var(--primary);
             border-color: var(--primary);
         }
-        
         .btn-primary:hover {
             background-color: var(--primary-dark);
             border-color: var(--primary-dark);
         }
-        
-        /* ----- توافقية الموبايل ----- */
         @media (min-width: 768px) {
             .header-container {
                 flex-direction: row;
                 justify-content: space-between;
             }
-            
             .logo-container {
                 margin-bottom: 0;
             }
-            
             .main-nav {
                 width: auto;
                 margin-top: 0;
             }
-            
             .nav-list {
                 justify-content: flex-end;
             }
         }
-        
         @media (max-width: 767px) {
             .site-title {
                 font-size: 24px;
             }
-            
             .site-subtitle {
                 font-size: 14px;
             }
-            
             .nav-item {
                 margin: 3px 5px;
             }
-            
             .nav-link {
                 padding: 6px 10px;
                 font-size: 14px;
@@ -228,7 +197,7 @@ if (!isset($pageTitle)) {
                 <div class="site-subtitle">خدمات برمجة السيارات</div>
             </div>
         </div>
-        
+
         <nav class="main-nav">
             <ul class="nav-list">
                 <li class="nav-item">
@@ -243,7 +212,6 @@ if (!isset($pageTitle)) {
                 </li>
                 <?php if (isset($_SESSION['username'])): ?>
                     <li class="nav-item">
-                        <!-- تم تعديل المسار بشكل صحيح (بقاء في نفس المجلد) -->
                         <a href="my_tickets.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'my_tickets.php' ? 'active' : ''; ?>">
                             <i class="fas fa-ticket-alt nav-icon"></i> تذاكري
                         </a>
@@ -276,4 +244,4 @@ if (!isset($pageTitle)) {
 </header>
 
 <div class="main-content">
-    <!-- محتوى الصفحة سيأتي هنا -->
+<!-- محتوى الصفحة يأتي هنا -->

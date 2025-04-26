@@ -1,34 +1,41 @@
 <?php
 session_start();
-include 'db_connect.php';
+require_once 'includes/db.php';
 
 $login_error = '';
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = mysqli_real_escape_string($conn, $_POST['email']);
-    $password = mysqli_real_escape_string($conn, $_POST['password']);
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $email = trim($_POST['email']);
+    $password = trim($_POST['password']);
 
-    $sql = "SELECT * FROM users WHERE email = '$email' AND password = '$password'";
-    $result = mysqli_query($conn, $sql);
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = :email LIMIT 1");
+        $stmt->execute(['email' => $email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (mysqli_num_rows($result) == 1) {
-        $user = mysqli_fetch_assoc($result);
-        $_SESSION['email'] = $user['email'];
-        $_SESSION['username'] = $user['username'];
-        $_SESSION['user_type'] = $user['role']; // حفظ نوع المستخدم
-        header("Location: home.php");
-        exit;
-    } else {
-        $login_error = "❌ البريد الإلكتروني أو كلمة المرور غير صحيحة.";
+        if ($user && $password === $user['password']) {
+            // تسجيل الدخول الناجح
+            $_SESSION['email'] = $user['email'];
+            $_SESSION['username'] = $user['username'];
+            $_SESSION['user_role'] = $user['role']; // لاحظ توحيد user_role
+            header("Location: home.php");
+            exit;
+        } else {
+            $login_error = "❌ البريد الإلكتروني أو كلمة المرور غير صحيحة.";
+        }
+    } catch (PDOException $e) {
+        die("Database error: " . $e->getMessage());
     }
 }
 ?>
 
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <title>تسجيل الدخول | FlexAuto</title>
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             margin: 0;
@@ -38,7 +45,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             font-family: "Segoe UI", Tahoma, sans-serif;
             color: white;
         }
-
         header {
             background-color: rgba(0, 0, 0, 0.75);
             padding: 20px;
@@ -48,7 +54,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             color: #00ffff;
             letter-spacing: 1px;
         }
-
         .login-box {
             background: rgba(0, 0, 0, 0.6);
             padding: 40px;
@@ -57,12 +62,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             border-radius: 12px;
             box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
         }
-
         .login-box h2 {
             text-align: center;
             margin-bottom: 25px;
         }
-
         .login-box input[type="email"],
         .login-box input[type="password"],
         .login-box input[type="submit"] {
@@ -73,35 +76,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             border-radius: 6px;
             font-size: 15px;
         }
-
         .login-box input[type="submit"] {
             background-color: #1e90ff;
             color: white;
             cursor: pointer;
         }
-
         .login-box input[type="submit"]:hover {
             background-color: #63b3ed;
         }
-
         .extra-links {
             margin-top: 20px;
             text-align: center;
         }
-
         .extra-links a {
             color: #00ffff;
             text-decoration: none;
             display: block;
             margin: 8px 0;
         }
-
         .error {
             color: #ff7b7b;
             text-align: center;
             margin-top: 15px;
         }
-
         footer {
             background-color: rgba(0, 0, 0, 0.8);
             color: #eee;
@@ -110,7 +107,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             font-size: 14px;
             margin-top: 40px;
         }
-
         .footer-highlight {
             font-size: 20px;
             font-weight: bold;
@@ -132,7 +128,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     </form>
 
     <?php if (!empty($login_error)): ?>
-        <div class="error"><?= $login_error ?></div>
+        <div class="error"><?= htmlspecialchars($login_error) ?></div>
     <?php endif; ?>
 
     <div class="extra-links">

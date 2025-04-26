@@ -170,7 +170,7 @@ if (!$ticket) {
 
 <main>
     <div class="container">
-        <h1>تفاصيل التذكرة: FLEX-<?= $ticket['id'] ?></h1>
+        <h1>تفاصيل التذكرة: FLEX-<?= htmlspecialchars($ticket['id']) ?></h1>
 
         <div class="info-row">
             <div class="info-label">نوع الخدمة:</div>
@@ -208,7 +208,7 @@ if (!$ticket) {
         <?php endif; ?>
 
         <div class="buttons">
-            <a href="includes/my_tickets.php" class="btn btn-primary"><i class="fas fa-arrow-right"></i> رجوع</a>
+            <a href="my_tickets.php" class="btn btn-primary"><i class="fas fa-arrow-right"></i> رجوع</a>
             <button onclick="window.print();" class="btn btn-secondary"><i class="fas fa-print"></i> طباعة</button>
         </div>
     </div>
