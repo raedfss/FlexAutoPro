@@ -1,42 +1,37 @@
 <?php
 // FlexAutoPro - includes/db.php
-// إعداد الاتصال بقاعدة البيانات باستخدام PDO - يدعم Localhost و PostgreSQL على Railway
+// إعداد الاتصال بقاعدة البيانات عبر PDO
+// يدعم MySQL محلي (XAMPP) أو PostgreSQL على Railway باستخدام Environment Variables
 
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-
-if (str_contains($host, 'localhost')) {
-    // 📌 بيئة التطوير: Localhost باستخدام MySQL
-    $db_type = 'mysql';
-    $db_host = 'localhost';
-    $db_name = 'flexauto';    // تأكد أنه نفس اسم قاعدة البيانات لديك في XAMPP
-    $db_user = 'root';
-    $db_pass = '';
-    $db_charset = 'utf8mb4';
+// إذا وجدت متغيّرات PGHOST فاعتبر البيئة إنتاج (Railway)
+if (getenv('PGHOST')) {
+    // 📌 Production: PostgreSQL on Railway
+    $db_type  = 'pgsql';
+    $db_host  = getenv('PGHOST');
+    $db_port  = getenv('PGPORT') ?: '5432';
+    $db_name  = getenv('PGDATABASE');
+    $db_user  = getenv('PGUSER');
+    $db_pass  = getenv('PGPASSWORD');
+    $dsn      = "pgsql:host={$db_host};port={$db_port};dbname={$db_name};sslmode=require";
 } else {
-    // 📌 بيئة الإنتاج: Railway باستخدام PostgreSQL
-    $db_type = 'pgsql';
-    $db_host = 'monorail.proxy.rlwy.net';
-    $db_port = '5432';
-    $db_name = 'railway';
-    $db_user = 'postgres';
-    $db_pass = 'qPDuGhAJpcnSsGanToKibGYbhGSAvyat';
+    // 📌 Development: MySQL on Localhost (XAMPP)
+    $db_type    = 'mysql';
+    $db_host    = '127.0.0.1';
+    $db_name    = 'flexauto';      // غيّر هذا إلى اسم قاعدتك المحلية
+    $db_user    = 'root';
+    $db_pass    = '';
+    $db_charset = 'utf8mb4';
+    $dsn        = "mysql:host={$db_host};dbname={$db_name};charset={$db_charset}";
 }
 
 try {
-    if ($db_type === 'mysql') {
-        $dsn = "mysql:host=$db_host;dbname=$db_name;charset=$db_charset";
-        $pdo = new PDO($dsn, $db_user, $db_pass);
-    } elseif ($db_type === 'pgsql') {
-        $dsn = "pgsql:host=$db_host;port=$db_port;dbname=$db_name";
-        $pdo = new PDO($dsn, $db_user, $db_pass);
-    } else {
-        throw new Exception("Unsupported database type: $db_type");
-    }
-
-    // إعدادات أمان وأخطاء
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    $pdoOptions = [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ];
+    $pdo = new PDO($dsn, $db_user, $db_pass, $pdoOptions);
 
 } catch (PDOException $e) {
+    // إذا فشل الاتصال، أظهر رسالة واضحة ثم أوقف التنفيذ
     die("Database Connection Failed: " . $e->getMessage());
 }
-?>
