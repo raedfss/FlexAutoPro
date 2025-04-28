@@ -1,6 +1,6 @@
 <?php
 // FlexAutoPro - includes/db.php
-// الاتصال بقاعدة بيانات PostgreSQL عبر Neon.tech
+// اتصال طوارئ بدون SSL فقط للاختبار
 
 $db_type  = 'pgsql';
 $db_host  = 'ep-silent-recipe-a4whzvsp-pooler.us-east-1.aws.neon.tech';
@@ -8,7 +8,8 @@ $db_port  = '5432';
 $db_name  = 'neondb';
 $db_user  = 'neondb_owner';
 $db_pass  = 'npg_eWfsJy0PN5EQ';
-$dsn      = "pgsql:host={$db_host};port={$db_port};dbname={$db_name};sslmode=require";
+// حذف "?sslmode=require" مؤقتًا للاختبار
+$dsn      = "pgsql:host={$db_host};port={$db_port};dbname={$db_name}";
 
 try {
     $pdoOptions = [
