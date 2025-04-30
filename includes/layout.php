@@ -1,26 +1,9 @@
-<?php
-// منع الوصول المباشر
-if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
-    http_response_code(403);
-    exit('🚫 لا يمكنك الوصول إلى هذا الملف مباشرة.');
-}
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-$is_admin = isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin';
-$site_title = 'FlexAuto';
-$page_title = $page_title ?? $site_title;
-$current_path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$current_page = basename($current_path);
-?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title><?= htmlspecialchars($page_title) ?></title>
+  <title><?= htmlspecialchars($page_title ?? 'FlexAuto') ?></title>
 
   <!-- الخطوط والأيقونات -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
@@ -115,25 +98,20 @@ $current_page = basename($current_path);
     }
 
     if ($alert_message): ?>
-    <div class="alert alert-<?= $alert_class ?>" style="padding: 10px; border-radius: 5px; margin-bottom: 15px;">
+    <div class="alert alert-<?= $alert_class ?>">
       <i class="fas fa-<?= $icon ?>"></i> <?= $alert_message ?>
     </div>
   <?php endif; endif; ?>
 
-  <?php if (isset($notification)): ?>
-    <?= $notification ?>
-  <?php endif; ?>
-
-  <?php if (isset($content_start)): ?>
-    <?= $content_start ?>
-  <?php endif; ?>
+  <?= $notification ?? '' ?>
+  <?= $content_start ?? '' ?>
 </main>
 
 <footer>
   <div class="footer-highlight">ذكاءٌ في الخدمة، سرعةٌ في الاستجابة، جودةٌ بلا حدود.</div>
   <div>Smart service, fast response, unlimited quality.</div>
-  <div style="margin-top: 8px;">📧 raedfss@hotmail.com | ☎️ +962796519007</div>
-  <div style="margin-top: 5px;">&copy; <?= date('Y') ?> FlexAuto. جميع الحقوق محفوظة.</div>
+  <div>📧 raedfss@hotmail.com | ☎️ +962796519007</div>
+  <div>&copy; <?= date('Y') ?> FlexAuto. جميع الحقوق محفوظة.</div>
 </footer>
 
 <?php if (isset($page_js)): ?>
