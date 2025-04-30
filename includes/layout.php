@@ -1,4 +1,3 @@
-<!DOCTYPE html>
 <?php
 // منع الوصول المباشر
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
@@ -145,5 +144,3 @@ $current_page = basename($current_path);
 
 </body>
 </html>
-
-
