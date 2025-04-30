@@ -1,53 +1,51 @@
 <?php
-// FlexAutoPro - Admin Dashboard
-
-// بدء الجلسة
-session_start();
-
-// استدعاء الملفات المطلوبة
-require_once 'includes/db.php';
-require_once 'includes/functions.php';
-require_once 'includes/header.php';
-
-// التحقق من صلاحيات المشرف
-if (!isset($_SESSION['user_role']) || $_SESSION['user_role'] !== 'admin') {
-    header("Location: login.php");
-    exit();
+// index.php – صفحة التعريف العامة للزوار
+$page_title = "مرحبًا بك في FlexAuto";
+$page_css = <<<CSS
+.hero {
+    background: linear-gradient(to left, #004080, #003060);
+    color: white;
+    padding: 80px 20px;
+    text-align: center;
 }
-?>
+.hero h1 {
+    font-size: 3rem;
+    font-weight: 700;
+}
+.hero p {
+    font-size: 1.2rem;
+    margin-bottom: 30px;
+}
+.section-title {
+    text-align: center;
+    margin: 50px 0 20px;
+    font-weight: bold;
+}
+.map-container {
+    margin-bottom: 40px;
+}
+CSS;
 
-<main class="container">
-    <h1 class="text-center mb-4" style="color: #00ffff;">لوحة تحكم المشرف</h1>
+$page_content = <<<HTML
+<div class="hero">
+    <h1>مرحبًا بك في FlexAuto</h1>
+    <p>نقدم لك خدمات متقدمة لورش صيانة السيارات – برمجة مفاتيح، تعديل برمجيات، مسح بيانات الحوادث والمزيد.</p>
+    <a href="register.php" class="btn btn-light btn-lg">ابدأ الآن</a>
+</div>
 
-    <p class="text-center">مرحبًا، <strong><?= htmlspecialchars($_SESSION['username']) ?></strong> 👋</p>
-    <p class="text-center mb-5">هذه هي لوحة تحكم الإدارة. يمكنك من هنا إدارة النظام بالكامل.</p>
+<div class="container">
+    <h2 class="section-title">📍 مواقع فروعنا</h2>
 
-    <div class="admin-links" style="max-width: 500px; margin: auto;">
-        <ul style="list-style: none; padding: 0;">
-            <li style="margin: 10px 0;">
-                <a href="users.php" class="btn btn-primary w-100">
-                    👥 إدارة المستخدمين
-                </a>
-            </li>
-            <li style="margin: 10px 0;">
-                <a href="requests.php" class="btn btn-primary w-100">
-                    📄 متابعة الطلبات
-                </a>
-            </li>
-            <li style="margin: 10px 0;">
-                <a href="logs.php" class="btn btn-primary w-100">
-                    🕵️ سجل العمليات
-                </a>
-            </li>
-            <li style="margin: 10px 0;">
-                <a href="settings.php" class="btn btn-primary w-100">
-                    ⚙️ إعدادات النظام
-                </a>
-            </li>
-        </ul>
+    <div class="map-container">
+        <h5>الفرع الأول – الزرقاء / المنطقة الحرة / شارع 20</h5>
+        <iframe src="https://maps.google.com/maps?q=الزرقاء المنطقة الحرة&t=&z=15&ie=UTF8&iwloc=&output=embed" width="100%" height="300" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
     </div>
-</main>
 
-<?php
-require_once 'includes/footer.php';
-?>
+    <div class="map-container">
+        <h5>الفرع الثاني – عمان / القويسمة / مجمع عبود</h5>
+        <iframe src="https://maps.google.com/maps?q=عمان القويسمة مجمع عبود&t=&z=15&ie=UTF8&iwloc=&output=embed" width="100%" height="300" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+    </div>
+</div>
+HTML;
+
+require_once 'includes/layout.php';
