@@ -1,113 +1,110 @@
 <?php
-session_start();
-
-// 1) المصادقة – تأكد أن المستخدم مسجل وله النوع 'user'
-require_once __DIR__ . '/includes/auth.php';
-if (!isset($_SESSION['user_type']) || $_SESSION['user_type'] !== 'user') {
-    header('Location: login.php');
-    exit;
+$page_title = "طلب تعديل برمجيات ECU";
+$page_css = <<<CSS
+.ecu-form {
+    max-width: 700px;
+    margin: auto;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.05);
 }
+CSS;
 
-// 2) الاتصال بقاعدة البيانات (PDO)
-require_once __DIR__ . '/includes/db.php';
+$success_msg = "";
 
-// 3) الدوال المساعدة (showMessage)
-require_once __DIR__ . '/includes/functions.php';
-
-// 4) تضمين الهيدر العام
-require_once __DIR__ . '/includes/header.php';
-
-// تهيئة رسائل الخطأ والنجاح
-$error   = '';
-$success = '';
-
-// 5) معالجة إرسال النموذج
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $ecu_model     = trim($_POST['ecu_model']     ?? '');
-    $modifications = trim($_POST['modifications'] ?? '');
-    $file          = $_FILES['ecu_file']         ?? null;
+    require_once 'includes/db.php';
 
-    // التحقق من اكتمال الحقول
-    if ($ecu_model === '' || $modifications === '' || !$file) {
-        $error = "❌ جميع الحقول مطلوبة.";
+    $car_type = trim($_POST['car_type']);
+    $vin = strtoupper(trim($_POST['vin']));
+    $contact = trim($_POST['contact']);
+    $programmer = trim($_POST['programmer']);
+    $tool_type = trim($_POST['tool_type']);
+    $filename = '';
+
+    // تحقق من رقم الشاسيه وحقول التواصل
+    if (strlen($vin) === 17 && $car_type && $contact) {
+        // رفع الملف إذا وُجد
+        if (isset($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
+            $ext = pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION);
+            $filename = 'ecu_' . time() . '_' . rand(1000,9999) . '.' . $ext;
+            move_uploaded_file($_FILES['file']['tmp_name'], __DIR__ . "/uploads/$filename");
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO tickets (username, car_type, request_type, vin, phone_number, status, is_seen, created_at, data1, data2, file_path)
+                               VALUES ('Guest', :car_type, 'ECU Tuning', :vin, :contact, 'pending', 0, NOW(), :programmer, :tool_type, :file)");
+
+        $stmt->execute([
+            'car_type' => $car_type,
+            'vin' => $vin,
+            'contact' => $contact,
+            'programmer' => $programmer,
+            'tool_type' => $tool_type,
+            'file' => $filename
+        ]);
+
+        $success_msg = "✅ تم استلام طلبك بنجاح، سيتواصل معك فريقنا قريبًا.";
     } else {
-        // فحص الامتداد والحجم
-        $allowed_exts = ['bin','hex','ori','mod'];
-        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-
-        if (!in_array($ext, $allowed_exts, true)) {
-            $error = "❌ الملف غير مدعوم. الصيغ المسموحة: bin, hex, ori, mod.";
-        }
-        elseif ($file['size'] > 3 * 1024 * 1024) {
-            $error = "❌ حجم الملف كبير؛ الحد الأقصى 3 ميجابايت.";
-        }
-        else {
-            // إعداد مسار الرفع
-            $uploadDir = __DIR__ . '/uploads/';
-            if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
-            }
-
-            // توليد اسم فريد للملف
-            $filename = uniqid('ecu_', true) . '.' . $ext;
-            $destination = $uploadDir . $filename;
-
-            if (move_uploaded_file($file['tmp_name'], $destination)) {
-                // حفظ الطلب في قاعدة البيانات
-                $stmt = $pdo->prepare("
-                    INSERT INTO ecu_tuning_requests
-                      (user_id, ecu_model, modifications, uploaded_file, created_at)
-                    VALUES
-                      (:uid, :model, :mods, :file, NOW())
-                ");
-                $stmt->execute([
-                    ':uid'    => $_SESSION['user_id'],
-                    ':model'  => $ecu_model,
-                    ':mods'   => $modifications,
-                    ':file'   => $filename
-                ]);
-
-                $success = "✅ تم إرسال طلب تعديل برمجة وحدة ECU بنجاح.";
-            } else {
-                $error = "❌ فشل في رفع الملف، الرجاء المحاولة مرة أخرى.";
-            }
-        }
+        $success_msg = "❌ تأكد من إدخال رقم الشاسيه المكون من 17 خانة وكافة الحقول الإلزامية.";
     }
 }
-?>
 
-<div class="container">
-    <h2>⚙️ طلب تعديل برمجة وحدة ECU</h2>
+$page_content = <<<HTML
+<div class="ecu-form">
+    <h2 class="text-center mb-4">🔧 طلب تعديل برمجيات ECU</h2>
+    {$success_msg ? "<div class='alert alert-info'>$success_msg</div>" : ""}
+    <form method="POST" enctype="multipart/form-data" onsubmit="return validateVIN();">
 
-    <?php
-    // عرض رسائل
-    if ($error)   showMessage('danger', $error);
-    if ($success) showMessage('success', $success);
-    ?>
-
-    <form method="POST" enctype="multipart/form-data" class="form-style">
-        <div class="form-group">
-            <label for="ecu_model">موديل وحدة ECU:</label>
-            <input type="text" id="ecu_model" name="ecu_model" required
-                   value="<?= htmlspecialchars($_POST['ecu_model'] ?? '', ENT_QUOTES) ?>">
+        <div class="mb-3">
+            <label for="car_type" class="form-label">نوع السيارة</label>
+            <input type="text" name="car_type" id="car_type" class="form-control" required>
         </div>
 
-        <div class="form-group">
-            <label for="modifications">التعديلات المطلوبة:</label>
-            <textarea id="modifications" name="modifications" rows="4" required><?= htmlspecialchars($_POST['modifications'] ?? '', ENT_QUOTES) ?></textarea>
+        <div class="mb-3">
+            <label for="vin" class="form-label">رقم الشاسيه (VIN)</label>
+            <input type="text" name="vin" id="vin" class="form-control" maxlength="17" required placeholder="17 خانة">
         </div>
 
-        <div class="form-group">
-            <label for="ecu_file">ملف ECU (.bin, .hex, .ori, .mod):</label>
-            <input type="file" id="ecu_file" name="ecu_file"
-                   accept=".bin,.hex,.ori,.mod" required>
+        <div class="mb-3">
+            <label for="contact" class="form-label">رقم الهاتف أو البريد الإلكتروني</label>
+            <input type="text" name="contact" id="contact" class="form-control" required>
         </div>
 
-        <button type="submit" class="btn-submit">إرسال الطلب</button>
+        <div class="mb-3">
+            <label for="programmer" class="form-label">اسم المبرمج (اختياري)</label>
+            <input type="text" name="programmer" id="programmer" class="form-control">
+        </div>
+
+        <div class="mb-3">
+            <label for="tool_type" class="form-label">نوع الأداة المستخدمة</label>
+            <select name="tool_type" id="tool_type" class="form-select" required>
+                <option value="Master">Master</option>
+                <option value="Slave">Slave</option>
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="file" class="form-label">رفع ملف (اختياري)</label>
+            <input type="file" name="file" id="file" class="form-control">
+        </div>
+
+        <div class="text-center">
+            <button type="submit" class="btn btn-primary">📩 إرسال الطلب</button>
+        </div>
     </form>
 </div>
 
-<?php
-// 6) تضمين الفوتر العام
-require_once __DIR__ . '/includes/footer.php';
-?>
+<script>
+function validateVIN() {
+    var vin = document.getElementById('vin').value.trim();
+    if (vin.length !== 17) {
+        alert("يجب أن يكون رقم الشاسيه 17 خانة.");
+        return false;
+    }
+    return true;
+}
+</script>
+HTML;
+
+require_once 'includes/layout.php';
