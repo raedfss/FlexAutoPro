@@ -114,11 +114,9 @@ $page_css = <<<CSS
 }
 CSS;
 
-// إدراج القالب
-include __DIR__ . '/includes/layout.php';
+// تعريف محتوى الصفحة
+ob_start();
 ?>
-
-<!-- ✅ محتوى الصفحة الرئيسي -->
 <div class="container">
   <div class="avatar"><?= strtoupper(substr($username, 0, 1)) ?></div>
   <div class="role">لقد سجلت الدخول بصلاحية: <strong><?= $user_type === 'admin' ? 'مدير النظام 👑' : 'مستخدم 👤' ?></strong></div>
@@ -151,3 +149,9 @@ include __DIR__ . '/includes/layout.php';
     <a href="logout.php">🔓 تسجيل الخروج</a>
   </div>
 </div>
+<?php
+$page_content = ob_get_clean();
+
+// إدراج القالب
+include __DIR__ . '/includes/layout.php';
+?>
