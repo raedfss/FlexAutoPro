@@ -1,23 +1,18 @@
+<!DOCTYPE html>
 <?php
-// منع الوصول المباشر للملف
+// منع الوصول المباشر
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'])) {
     http_response_code(403);
     exit('🚫 لا يمكنك الوصول إلى هذا الملف مباشرة.');
 }
 
-// بدء الجلسة إذا لم تبدأ
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// معلومات المستخدم
 $is_admin = isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin';
-
-// إعداد العنوان
 $site_title = 'FlexAuto';
 $page_title = $page_title ?? $site_title;
-
-// تحديد الصفحة الحالية
 $current_path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $current_page = basename($current_path);
 ?>
@@ -48,7 +43,6 @@ $current_page = basename($current_path);
   </div>
 <?php endif; ?>
 
-<!-- الهيدر -->
 <header>
   <div class="logo"><i class="fas fa-tools"></i> FlexAuto</div>
   <div class="nav">
@@ -71,7 +65,6 @@ $current_page = basename($current_path);
   </div>
 </header>
 
-<!-- المحتوى الرئيسي -->
 <main>
   <?php if (($show_diagnostic ?? false) && $is_admin): ?>
     <div class="diagnostic-container">
@@ -122,8 +115,7 @@ $current_page = basename($current_path);
         break;
     }
 
-    if ($alert_message):
-  ?>
+    if ($alert_message): ?>
     <div class="alert alert-<?= $alert_class ?>" style="padding: 10px; border-radius: 5px; margin-bottom: 15px;">
       <i class="fas fa-<?= $icon ?>"></i> <?= $alert_message ?>
     </div>
@@ -138,7 +130,6 @@ $current_page = basename($current_path);
   <?php endif; ?>
 </main>
 
-<!-- الفوتر -->
 <footer>
   <div class="footer-highlight">ذكاءٌ في الخدمة، سرعةٌ في الاستجابة، جودةٌ بلا حدود.</div>
   <div>Smart service, fast response, unlimited quality.</div>
@@ -146,7 +137,6 @@ $current_page = basename($current_path);
   <div style="margin-top: 5px;">&copy; <?= date('Y') ?> FlexAuto. جميع الحقوق محفوظة.</div>
 </footer>
 
-<!-- JavaScript المخصص للصفحة -->
 <?php if (isset($page_js)): ?>
 <script>
   <?= $page_js ?>
@@ -155,3 +145,5 @@ $current_page = basename($current_path);
 
 </body>
 </html>
+
+
