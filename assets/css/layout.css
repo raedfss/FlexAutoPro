@@ -43,10 +43,10 @@ header {
 
 main {
   flex: 1;
-  padding: 20px;
   width: 100%;
-  box-sizing: border-box;
   max-width: 1400px;
+  padding: 30px 20px;
+  box-sizing: border-box;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -57,7 +57,8 @@ footer {
   padding: 15px 20px;
   background: #070e1b;
   color: #ccc;
-  margin-top: auto; /* يضمن وضع الفوتر أسفل المحتوى دائمًا */
+  margin-top: auto; /* يضمن وضع الفوتر في الأسفل دائمًا */
+  width: 100%;
 }
 
 .footer-highlight {
