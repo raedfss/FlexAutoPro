@@ -2,13 +2,14 @@
 session_start();
 
 // منع الدخول المباشر بدون تسجيل دخول
+
 if (!isset($_SESSION['email'])) {
     header("Location: login.php");
     exit;
 }
 
 $username = $_SESSION['username'];
-$user_type = isset($_SESSION['user_type']) ? $_SESSION['user_type'] : 'user'; // حل المشكلة هنا
+$user_type = isset($_SESSION['user_role']) ? $_SESSION['user_role'] : 'user';
 ?>
 
 <!DOCTYPE html>
