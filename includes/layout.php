@@ -34,41 +34,6 @@ $current_page = basename($current_path);
   <?php if (isset($page_css)): ?>
     <style><?= $page_css ?></style>
   <?php endif; ?>
-  
-  <!-- إضافة أنماط CSS لإصلاح مشكلة الفوتر -->
-  <style>
-    html, body {
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-    }
-    
-    body {
-      display: flex;
-      flex-direction: column;
-      min-height: 100vh;
-    }
-    
-    main {
-      flex: 1 0 auto;
-      padding-bottom: 20px;
-    }
-    
-    footer {
-      flex-shrink: 0;
-      width: 100%;
-      margin-top: auto;
-    }
-    
-    /* تأكيد أن المحتوى لا يظهر أسفل الفوتر */
-    .content-wrapper {
-      display: flex;
-      flex-direction: column;
-      flex: 1 0 auto;
-    }
-  </style>
 </head>
 <body>
 
@@ -100,62 +65,59 @@ $current_page = basename($current_path);
   </div>
 </header>
 
-<div class="content-wrapper">
-  <main>
-    <?php if (($show_diagnostic ?? false) && $is_admin === 'admin'): ?>
-      <div class="diagnostic-container">
-        <div class="diagnostic-col">
-          <h3>DIAGNOSTIC RUNNING</h3>
-          <p>MODEL TYPE: PRECISION GT</p>
-          <p>ECU VERSION: 4.21.0</p>
-          <p>STATUS: OPTIMIZING...</p>
-        </div>
-        <div class="diagnostic-col">
-          <h3>DIAGNOSTIC CODE: P4E27</h3>
-          <p>MODULE: ENGINE CONTROL</p>
-          <p>RESOLUTION: IN PROGRESS 42%</p>
-        </div>
+<main>
+  <?php if (($show_diagnostic ?? false) && $is_admin === 'admin'): ?>
+    <div class="diagnostic-container">
+      <div class="diagnostic-col">
+        <h3>DIAGNOSTIC RUNNING</h3>
+        <p>MODEL TYPE: PRECISION GT</p>
+        <p>ECU VERSION: 4.21.0</p>
+        <p>STATUS: OPTIMIZING...</p>
       </div>
-    <?php endif; ?>
+      <div class="diagnostic-col">
+        <h3>DIAGNOSTIC CODE: P4E27</h3>
+        <p>MODULE: ENGINE CONTROL</p>
+        <p>RESOLUTION: IN PROGRESS 42%</p>
+      </div>
+    </div>
+  <?php endif; ?>
 
-    <?php if (isset($page_title) && !($hide_title ?? false)): ?>
-      <h2><?= htmlspecialchars($display_title ?? $page_title) ?></h2>
-    <?php endif; ?>
+  <?php if (isset($page_title) && !($hide_title ?? false)): ?>
+    <h2><?= htmlspecialchars($display_title ?? $page_title) ?></h2>
+  <?php endif; ?>
 
-    <?php if (isset($_GET['status'])):
-      $status = htmlspecialchars($_GET['status']);
-      $alert_class = '';
-      $alert_message = '';
-      $icon = 'info-circle';
+  <?php if (isset($_GET['status'])):
+    $status = htmlspecialchars($_GET['status']);
+    $alert_class = '';
+    $alert_message = '';
+    $icon = 'info-circle';
 
-      switch ($status) {
-        case 'success': $alert_class = 'success'; $alert_message = 'تمت العملية بنجاح'; $icon = 'check-circle'; break;
-        case 'error': $alert_class = 'error'; $alert_message = 'حدث خطأ أثناء العملية'; $icon = 'exclamation-circle'; break;
-        case 'updated': $alert_class = 'success'; $alert_message = 'تم تحديث البيانات بنجاح'; $icon = 'check-circle'; break;
-        case 'deleted': $alert_class = 'warning'; $alert_message = 'تم حذف العنصر بنجاح'; $icon = 'exclamation-triangle'; break;
-      }
+    switch ($status) {
+      case 'success': $alert_class = 'success'; $alert_message = 'تمت العملية بنجاح'; $icon = 'check-circle'; break;
+      case 'error': $alert_class = 'error'; $alert_message = 'حدث خطأ أثناء العملية'; $icon = 'exclamation-circle'; break;
+      case 'updated': $alert_class = 'success'; $alert_message = 'تم تحديث البيانات بنجاح'; $icon = 'check-circle'; break;
+      case 'deleted': $alert_class = 'warning'; $alert_message = 'تم حذف العنصر بنجاح'; $icon = 'exclamation-triangle'; break;
+    }
 
-      if ($alert_message): ?>
-        <div class="alert alert-<?= $alert_class ?>">
-          <i class="fas fa-<?= $icon ?>"></i> <?= $alert_message ?>
-        </div>
-    <?php endif; endif; ?>
+    if ($alert_message): ?>
+      <div class="alert alert-<?= $alert_class ?>">
+        <i class="fas fa-<?= $icon ?>"></i> <?= $alert_message ?>
+      </div>
+  <?php endif; endif; ?>
 
-    <?= $notification ?? '' ?>
-    <?= $content_start ?? '' ?>
-    
-    <!-- هنا يأتي محتوى الصفحة عن طريق PHP Include -->
-    <?= $page_content ?? '' ?>
-    
-  </main>
+  <?= $notification ?? '' ?>
+  <?= $content_start ?? '' ?>
+  
+  <!-- محتوى الصفحة الرئيسي -->
+  <?= $page_content ?? '' ?>
+</main>
 
-  <footer>
-    <div class="footer-highlight">ذكاءٌ في الخدمة، سرعةٌ في الاستجابة، جودةٌ بلا حدود.</div>
-    <div>Smart service, fast response, unlimited quality.</div>
-    <div>📧 raedfss@hotmail.com | ☎️ +962796519007</div>
-    <div>&copy; <?= date('Y') ?> FlexAuto. جميع الحقوق محفوظة.</div>
-  </footer>
-</div>
+<footer>
+  <div class="footer-highlight">ذكاءٌ في الخدمة، سرعةٌ في الاستجابة، جودةٌ بلا حدود.</div>
+  <div>Smart service, fast response, unlimited quality.</div>
+  <div>📧 raedfss@hotmail.com | ☎️ +962796519007</div>
+  <div>&copy; <?= date('Y') ?> FlexAuto. جميع الحقوق محفوظة.</div>
+</footer>
 
 <?php if (isset($page_js)): ?>
 <script>
