@@ -8,7 +8,7 @@ if (!isset($_SESSION['email'])) {
 }
 
 $username = $_SESSION['username'];
-$user_type = $_SESSION['user_type']; // admin أو user
+$user_type = isset($_SESSION['user_type']) ? $_SESSION['user_type'] : 'user'; // حل المشكلة هنا
 ?>
 
 <!DOCTYPE html>
