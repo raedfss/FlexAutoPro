@@ -2,6 +2,7 @@
 session_start();
 require_once __DIR__ . '/includes/db.php';
 
+// التحقق من تسجيل الدخول
 if (!isset($_SESSION['email'])) {
     header("Location: login.php");
     exit;
@@ -9,121 +10,144 @@ if (!isset($_SESSION['email'])) {
 
 $username = $_SESSION['username'];
 $user_type = $_SESSION['user_role'] ?? 'user';
+$email = $_SESSION['email'] ?? '';
 
+// إعداد عنوان الصفحة
 $page_title = 'الصفحة الرئيسية';
 $display_title = 'مرحبًا، ' . htmlspecialchars($username);
 
-$page_css = "
-  .dashboard-box {
-    background: rgba(0, 0, 0, 0.6);
-    padding: 35px;
-    border-radius: 16px;
-    max-width: 700px;
-    margin: 0 auto;
-    box-shadow: 0 0 30px rgba(0, 255, 255, 0.08);
-    text-align: center;
-  }
+// عدد الإشعارات غير المقروءة (تأكد من وجود الجدول notifications في قاعدة البيانات)
+$notifications_count = 0;
+try {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM notifications WHERE user_email = ? AND is_read = 0");
+    $stmt->execute([$email]);
+    $notifications_count = $stmt->fetchColumn();
+} catch (PDOException $e) {
+    error_log("Notification error: " . $e->getMessage());
+}
 
-  .dashboard-box h3 {
-    margin-bottom: 30px;
-    color: #fff;
-  }
+// CSS مخصص للصفحة
+$page_css = <<<CSS
+.container {
+  background: rgba(0, 0, 0, 0.7);
+  padding: 35px;
+  width: 90%;
+  max-width: 880px;
+  border-radius: 16px;
+  text-align: center;
+  margin: 30px auto;
+  box-shadow: 0 0 40px rgba(0, 200, 255, 0.15);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(66, 135, 245, 0.25);
+}
+.avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #3494e6, #ec6ead);
+  margin: 0 auto 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  color: white;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+.role {
+  color: #a8d8ff;
+  margin: 15px auto 25px;
+  font-size: 18px;
+}
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 25px;
+}
+.links a {
+  padding: 15px 25px;
+  background: linear-gradient(145deg, #1e90ff, #0070cc);
+  color: white;
+  text-decoration: none;
+  border-radius: 10px;
+  font-weight: bold;
+  min-width: 180px;
+  transition: 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  position: relative;
+}
+.links a:hover {
+  transform: translateY(-4px);
+  background: linear-gradient(145deg, #2eaaff, #0088ff);
+}
+.notification-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: red;
+  color: white;
+  border-radius: 50%;
+  font-size: 12px;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.version-btn {
+  background: linear-gradient(145deg, #00c8ff, #007bff);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10px;
+  text-decoration: none;
+  display: inline-block;
+  margin-top: 10px;
+}
+.logout {
+  margin-top: 30px;
+}
+.logout a {
+  color: #ff6b6b;
+  font-weight: bold;
+  text-decoration: none;
+}
+CSS;
 
-  .button-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    justify-content: center;
-  }
-
-  .button-grid a {
-    padding: 14px 25px;
-    font-size: 16px;
-    font-weight: bold;
-    text-decoration: none;
-    color: #fff;
-    border-radius: 8px;
-    min-width: 180px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    transition: all 0.3s ease;
-  }
-
-  .admin-btn    { background: linear-gradient(135deg, #007bff, #3399ff); }
-  .admin-btn:hover { background: linear-gradient(135deg, #006ce0, #2b89f9); }
-
-  .danger-btn   { background: linear-gradient(135deg, #ff5722, #ff784e); }
-  .danger-btn:hover { background: linear-gradient(135deg, #e14415, #ff6233); }
-
-  .info-btn     { background: linear-gradient(135deg, #00bcd4, #33d2e0); }
-  .info-btn:hover { background: linear-gradient(135deg, #00a5bc, #30c2d2); }
-
-  .logout-btn   {
-    display: inline-block;
-    margin-top: 25px;
-    color: #ff6b6b;
-    text-decoration: none;
-    font-weight: bold;
-    padding: 10px 25px;
-    border: 1px solid rgba(255, 107, 107, 0.4);
-    border-radius: 6px;
-  }
-
-  .logout-btn:hover {
-    background-color: rgba(255, 107, 107, 0.1);
-    border-color: rgba(255, 107, 107, 0.6);
-  }
-
-  .version-btn {
-    margin-top: 20px;
-    display: inline-block;
-    background: linear-gradient(135deg, #00c8ff, #007bff);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 8px;
-    text-decoration: none;
-    transition: all 0.3s;
-    font-size: 14px;
-  }
-
-  .version-btn:hover {
-    background: linear-gradient(135deg, #007bff, #00c8ff);
-  }
-
-  .version-badge {
-    background-color: rgba(0,0,0,0.3);
-    padding: 2px 6px;
-    margin-right: 8px;
-    border-radius: 4px;
-    font-size: 12px;
-  }
-";
-
+// إدراج القالب
 include __DIR__ . '/includes/layout.php';
 ?>
 
-<div class="dashboard-box">
-  <h3>لقد سجلت الدخول بصلاحية: <strong><?= $user_type === 'admin' ? 'مدير النظام' : 'مستخدم' ?></strong></h3>
+<!-- ✅ محتوى الصفحة الرئيسي -->
+<div class="container">
+  <div class="avatar"><?= strtoupper(substr($username, 0, 1)) ?></div>
+  <div class="role">لقد سجلت الدخول بصلاحية: <strong><?= $user_type === 'admin' ? 'مدير النظام 👑' : 'مستخدم 👤' ?></strong></div>
 
-  <div class="button-grid">
+  <div class="links">
     <?php if ($user_type === 'admin'): ?>
-      <a href="dashboard.php" class="admin-btn">📊 لوحة التحكم</a>
-      <a href="manage_users.php" class="admin-btn">👥 إدارة المستخدمين</a>
-      <a href="admin_tickets.php" class="danger-btn">🎫 إدارة التذاكر</a>
-      <a href="logs.php" class="info-btn">📁 سجلات النظام</a>
+      <a href="dashboard.php">📊 لوحة التحكم</a>
+      <a href="manage_users.php">👥 إدارة المستخدمين</a>
+      <a href="admin_tickets.php" class="admin-highlight">🎫 إدارة التذاكر</a>
+      <a href="logs.php">📁 سجلات النظام</a>
     <?php else: ?>
-      <a href="key-code.php" class="admin-btn">🔑 كود المفتاح</a>
-      <a href="airbag-reset.php" class="admin-btn">💥 مسح بيانات الحوادث</a>
-      <a href="ecu-tuning.php" class="admin-btn">🚗 تعديل برمجة السيارة</a>
-      <a href="online-programming-ticket.php" class="admin-btn">🧾 حجز تذكرة برمجة</a>
-      <a href="includes/my_tickets.php" class="info-btn">📋 تذاكري السابقة</a>
+      <a href="key-code.php">🔑 كود المفتاح</a>
+      <a href="airbag-reset.php">💥 مسح بيانات الحوادث</a>
+      <a href="ecu-tuning.php">🚗 تعديل برمجة السيارة</a>
+      <a href="online-programming-ticket.php">🧾 حجز برمجة أونلاين</a>
+      <a href="includes/my_tickets.php">
+        📋 تذاكري
+        <?php if ($notifications_count > 0): ?>
+          <span class="notification-badge"><?= $notifications_count ?></span>
+        <?php endif; ?>
+      </a>
     <?php endif; ?>
   </div>
 
   <a href="version.php" class="version-btn">
-    <span class="version-badge">v1.01</span> 🔄 آخر التحديثات
+    🔄 آخر التحديثات والتعديلات
   </a>
 
-  <div>
-    <a href="logout.php" class="logout-btn">🔓 تسجيل الخروج</a>
+  <div class="logout">
+    <a href="logout.php">🔓 تسجيل الخروج</a>
   </div>
 </div>
