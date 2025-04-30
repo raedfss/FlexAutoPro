@@ -1,18 +1,14 @@
 <?php
 session_start();
-
-// ✅ استخدام اتصال PostgreSQL الصحيح
 require_once __DIR__ . '/includes/db.php';
 
-// ✅ التحقق من صلاحية الأدمن
+// التحقق من صلاحية الأدمن
 if (!isset($_SESSION['email']) || $_SESSION['user_role'] !== 'admin') {
     header("Location: login.php");
     exit;
 }
 
-// ==========================
-//  تحديث حالة التذكرة
-// ==========================
+// تحديث حالة التذكرة
 if (isset($_GET['mark_seen']) && is_numeric($_GET['mark_seen'])) {
     $id = (int) $_GET['mark_seen'];
     $stmt = $pdo->prepare("UPDATE tickets SET is_seen = 1 WHERE id = :id");
@@ -21,9 +17,7 @@ if (isset($_GET['mark_seen']) && is_numeric($_GET['mark_seen'])) {
     exit;
 }
 
-// ==========================
-//  إلغاء التذكرة
-// ==========================
+// إلغاء التذكرة
 if (isset($_GET['cancel_ticket']) && is_numeric($_GET['cancel_ticket'])) {
     $id = (int) $_GET['cancel_ticket'];
     $stmt = $pdo->prepare("UPDATE tickets SET status = 'cancelled' WHERE id = :id");
@@ -32,13 +26,12 @@ if (isset($_GET['cancel_ticket']) && is_numeric($_GET['cancel_ticket'])) {
     exit;
 }
 
-// ==========================
-//  جلب كل التذاكر
-// ==========================
+// جلب التذاكر
 $stmt = $pdo->query("SELECT * FROM tickets ORDER BY created_at DESC");
 $tickets = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
 $total = count($tickets);
-$seen = count(array_filter($tickets, fn($t) => $t['is_seen']));
+$seen = count(array_filter($tickets, fn($t) => isset($t['is_seen']) && $t['is_seen']));
 $pending = $total - $seen;
 ?>
 
@@ -170,14 +163,14 @@ $pending = $total - $seen;
         <td><?= htmlspecialchars($row['chassis']) ?></td>
         <td><?= htmlspecialchars($row['service_type']) ?></td>
         <td>
-          <?php if ($row['is_seen']): ?>
+          <?php if (isset($row['is_seen']) && $row['is_seen']): ?>
             <span class="status-reviewed"><i class="fas fa-check-circle"></i> تمت المراجعة</span>
           <?php else: ?>
             <span class="status-pending"><i class="fas fa-clock"></i> قيد الانتظار</span>
           <?php endif; ?>
         </td>
         <td>
-          <?php if (!$row['is_seen']): ?>
+          <?php if (!isset($row['is_seen']) || !$row['is_seen']): ?>
             <a href="?mark_seen=<?= $row['id'] ?>" class="action-btn"><i class="fas fa-check"></i> مراجعة</a>
           <?php else: ?>
             <button class="action-btn btn-disabled"><i class="fas fa-check-circle"></i> تم</button>
