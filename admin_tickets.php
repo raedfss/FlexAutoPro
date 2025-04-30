@@ -36,27 +36,109 @@ $pending = $total - $seen;
 
 // تحديد عنوان الصفحة ليظهر في layout.php
 $page_title = "إدارة التذاكر";
-include 'includes/layout.php';
-?>
 
+// إضافة CSS للصفحة
+$page_css = <<<CSS
+.container {
+  background: rgba(15, 23, 42, 0.8);
+  border-radius: 10px;
+  padding: 25px;
+  margin-bottom: 30px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.ticket-stats {
+  display: flex;
+  justify-content: space-around;
+  background: rgba(30, 41, 59, 0.7);
+  padding: 15px;
+  border-radius: 8px;
+  margin: 20px 0;
+  font-size: 16px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 25px;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+thead tr {
+  background-color: #1e293b;
+  color: #f8fafc;
+  text-align: right;
+}
+
+th, td {
+  padding: 12px 15px;
+  text-align: right;
+}
+
+tbody tr {
+  border-bottom: 1px solid #3b3b3b;
+  transition: background-color 0.3s;
+}
+
+tbody tr:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.action-btn {
+  display: inline-block;
+  padding: 6px 12px;
+  margin: 3px;
+  border-radius: 5px;
+  text-decoration: none;
+  color: white;
+  background: #1e90ff;
+  cursor: pointer;
+  border: none;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.action-btn:hover {
+  background: #0078e7;
+  transform: translateY(-2px);
+}
+
+.btn-danger {
+  background: #ff6b6b;
+}
+
+.btn-danger:hover {
+  background: #e74c3c;
+}
+
+.btn-disabled {
+  background: #64748b;
+  cursor: not-allowed;
+}
+CSS;
+
+// تخزين محتوى الصفحة في متغير
+ob_start();
+?>
 <div class="container">
-  <h2>إدارة التذاكر</h2>
   <div class="ticket-stats">
     <div>إجمالي التذاكر: <strong><?= $total ?></strong></div>
     <div>تمت المراجعة: <strong><?= $seen ?></strong></div>
     <div>بانتظار المراجعة: <strong><?= $pending ?></strong></div>
   </div>
 
-  <table style="width: 100%; border-collapse: collapse; margin-top: 25px;">
+  <table>
     <thead>
-      <tr style="background-color: #1e293b;">
+      <tr>
         <th>رقم</th><th>العميل</th><th>هاتف</th><th>السيارة</th>
         <th>الشاصي</th><th>الخدمة</th><th>الحالة</th><th>الإجراء</th>
       </tr>
     </thead>
     <tbody>
     <?php foreach ($tickets as $row): ?>
-      <tr style="border-bottom: 1px solid #3b3b3b;">
+      <tr>
         <td>FLEX-<?= $row['id'] ?></td>
         <td><?= htmlspecialchars($row['username']) ?></td>
         <td><?= htmlspecialchars($row['phone']) ?></td>
@@ -86,3 +168,9 @@ include 'includes/layout.php';
     </tbody>
   </table>
 </div>
+<?php
+$page_content = ob_get_clean();
+
+// إدراج القالب
+include __DIR__ . '/includes/layout.php';
+?>
