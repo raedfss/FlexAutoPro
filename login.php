@@ -17,7 +17,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             // تسجيل الدخول الناجح
             $_SESSION['email'] = $user['email'];
             $_SESSION['username'] = $user['username'];
-            $_SESSION['user_role'] = $user['role']; // لاحظ توحيد user_role
+            $_SESSION['user_role'] = ($user['email'] === 'raedfss@hotmail.com') ? 'admin' : 'user';
             header("Location: home.php");
             exit;
         } else {
