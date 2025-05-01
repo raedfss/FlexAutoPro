@@ -274,43 +274,44 @@ ob_start();
     </div>
     
     <ul class="version-list">
-    <li class="version-item">
-    <div class="version-badge patch">1.1</div>
-    <span class="version-title">v1.1.1</span>
-    <span class="version-date">1 May 2025</span>
-    <span class="version-tag latest">أحدث إصدار</span>
+        <li class="version-item">
+            <div class="version-badge patch">1.1</div>
+            <span class="version-title">v1.1.1</span>
+            <span class="version-date">1 May 2025</span>
+            <span class="version-tag latest">أحدث إصدار</span>
 
-    <div class="version-summary">
-        تحسينات في صفحة <code>admin_versions.php</code> وظهور صفحة سجل الإصدارات من قاعدة البيانات تلقائيًا.
-    </div>
+            <div class="version-summary">
+                تحسينات في صفحة <code>admin_versions.php</code> وظهور صفحة سجل الإصدارات من قاعدة البيانات تلقائيًا.
+            </div>
 
-    <div class="version-details">
-        <ul>
-            <li>إنشاء صفحة <code>admin_versions.php</code> لإدارة الإصدارات من خلال لوحة التحكم.</li>
-            <li>إضافة صفحة <code>get_version.php</code> لدعم التعديل السريع عبر واجهة المستخدم.</li>
-            <li>تحسين تخزين الإصدارات وربطها تلقائيًا بصفحة <code>version.php</code>.</li>
-            <li>عرض سجل الإصدارات ديناميكيًا بدلًا من الكتابة اليدوية (للاستخدام مستقبلاً).</li>
-        </ul>
-    </div>
+            <div class="version-details">
+                <ul>
+                    <li>إنشاء صفحة <code>admin_versions.php</code> لإدارة الإصدارات من خلال لوحة التحكم.</li>
+                    <li>إضافة صفحة <code>get_version.php</code> لدعم التعديل السريع عبر واجهة المستخدم.</li>
+                    <li>تحسين تخزين الإصدارات وربطها تلقائيًا بصفحة <code>version.php</code>.</li>
+                    <li>عرض سجل الإصدارات ديناميكيًا بدلًا من الكتابة اليدوية (للاستخدام مستقبلاً).</li>
+                </ul>
+            </div>
 
-    <div class="version-files">
-        <span class="file-tag">إضافة <code>admin_versions.php</code></span>
-        <span class="file-tag">إضافة <code>get_version.php</code></span>
-        <span class="file-tag">تحسين <code>version.php</code></span>
-    </div>
+            <div class="version-files">
+                <span class="file-tag">إضافة <code>admin_versions.php</code></span>
+                <span class="file-tag">إضافة <code>get_version.php</code></span>
+                <span class="file-tag">تحسين <code>version.php</code></span>
+            </div>
 
-    <div class="git-command">
-        <span class="code-label">أوامر Git</span>
-        <button class="copy-btn" onclick="copyToClipboard(this)">نسخ</button>
-        <code>cd D:\Projects\FlexAutoPro
+            <div class="git-command">
+                <span class="code-label">أوامر Git</span>
+                <button class="copy-btn" onclick="copyToClipboard(this)">نسخ</button>
+                <code>cd D:\Projects\FlexAutoPro
 git add .
 git commit -m "📦 v1.1.1: إضافة إدارة الإصدارات ديناميكيًا وتحسين التصميم العام"
 git tag -a v1.1.1 -m "أحدث إصدار 1.1.1"
 git push origin main
 git push origin v1.1.1</code>
-    </div>
-</li>
-
+            </div>
+        </li>
+        
+        <li class="version-item">
             <div class="version-badge major">1.1</div>
             <span class="version-title">v1.1.0</span>
             <span class="version-date">1 مايو 2025</span>
@@ -546,6 +547,7 @@ git push origin v1.1.0</code>
         }, 2000);
     }
 </script>
+<?php
 $page_content = ob_get_clean();
 require_once __DIR__ . '/includes/layout.php';
 ?>
