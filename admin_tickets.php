@@ -8,17 +8,23 @@ if (!isset($_SESSION['email']) || $_SESSION['user_role'] !== 'admin') {
     exit;
 }
 
-// تحديث حالة التذكرة
-if (isset($_GET['mark_seen']) && is_numeric($_GET['mark_seen'])) {
+// إنشاء رمز CSRF إذا لم يكن موجودًا
+if (!isset($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrf_token = $_SESSION['csrf_token'];
+
+// التحقق من تنفيذ mark_seen
+if (isset($_GET['mark_seen'], $_GET['csrf']) && is_numeric($_GET['mark_seen']) && hash_equals($_SESSION['csrf_token'], $_GET['csrf'])) {
     $id = (int) $_GET['mark_seen'];
-    $stmt = $pdo->prepare("UPDATE tickets SET is_seen = 1 WHERE id = :id");
+    $stmt = $pdo->prepare("UPDATE tickets SET is_seen = TRUE WHERE id = :id");
     $stmt->execute(['id' => $id]);
     header("Location: admin_tickets.php");
     exit;
 }
 
-// إلغاء التذكرة
-if (isset($_GET['cancel_ticket']) && is_numeric($_GET['cancel_ticket'])) {
+// التحقق من تنفيذ cancel_ticket
+if (isset($_GET['cancel_ticket'], $_GET['csrf']) && is_numeric($_GET['cancel_ticket']) && hash_equals($_SESSION['csrf_token'], $_GET['csrf'])) {
     $id = (int) $_GET['cancel_ticket'];
     $stmt = $pdo->prepare("UPDATE tickets SET status = 'cancelled' WHERE id = :id");
     $stmt->execute(['id' => $id]);
@@ -34,10 +40,7 @@ $total = count($tickets);
 $seen = count(array_filter($tickets, fn($t) => isset($t['is_seen']) && $t['is_seen']));
 $pending = $total - $seen;
 
-// تحديد عنوان الصفحة ليظهر في layout.php
 $page_title = "إدارة التذاكر";
-
-// إضافة CSS للصفحة
 $page_css = <<<CSS
 .container {
   background: rgba(15, 23, 42, 0.8);
@@ -46,7 +49,6 @@ $page_css = <<<CSS
   margin-bottom: 30px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
-
 .ticket-stats {
   display: flex;
   justify-content: space-around;
@@ -56,7 +58,6 @@ $page_css = <<<CSS
   margin: 20px 0;
   font-size: 16px;
 }
-
 table {
   width: 100%;
   border-collapse: collapse;
@@ -65,27 +66,22 @@ table {
   border-radius: 8px;
   overflow: hidden;
 }
-
 thead tr {
   background-color: #1e293b;
   color: #f8fafc;
   text-align: right;
 }
-
 th, td {
   padding: 12px 15px;
   text-align: right;
 }
-
 tbody tr {
   border-bottom: 1px solid #3b3b3b;
   transition: background-color 0.3s;
 }
-
 tbody tr:hover {
   background-color: rgba(59, 130, 246, 0.1);
 }
-
 .action-btn {
   display: inline-block;
   padding: 6px 12px;
@@ -99,27 +95,22 @@ tbody tr:hover {
   font-size: 14px;
   transition: all 0.2s;
 }
-
 .action-btn:hover {
   background: #0078e7;
   transform: translateY(-2px);
 }
-
 .btn-danger {
   background: #ff6b6b;
 }
-
 .btn-danger:hover {
   background: #e74c3c;
 }
-
 .btn-disabled {
   background: #64748b;
   cursor: not-allowed;
 }
 CSS;
 
-// تخزين محتوى الصفحة في متغير
 ob_start();
 ?>
 <div class="container">
@@ -139,7 +130,7 @@ ob_start();
     <tbody>
     <?php foreach ($tickets as $row): ?>
       <tr>
-        <td>FLEX-<?= $row['id'] ?></td>
+        <td>FLEX-<?= htmlspecialchars($row['id']) ?></td>
         <td><?= htmlspecialchars($row['username']) ?></td>
         <td><?= htmlspecialchars($row['phone']) ?></td>
         <td><?= htmlspecialchars($row['car_type']) ?></td>
@@ -154,12 +145,13 @@ ob_start();
         </td>
         <td>
           <?php if (!isset($row['is_seen']) || !$row['is_seen']): ?>
-            <a href="?mark_seen=<?= $row['id'] ?>" class="action-btn"><i class="fas fa-check"></i> مراجعة</a>
+            <a href="?mark_seen=<?= $row['id'] ?>&csrf=<?= $csrf_token ?>" class="action-btn"><i class="fas fa-check"></i> مراجعة</a>
           <?php else: ?>
             <button class="action-btn btn-disabled"><i class="fas fa-check-circle"></i> تم</button>
           <?php endif; ?>
 
-          <a href="?cancel_ticket=<?= $row['id'] ?>" class="action-btn btn-danger" onclick="return confirm('هل أنت متأكد من إلغاء هذه التذكرة؟');">
+          <a href="?cancel_ticket=<?= $row['id'] ?>&csrf=<?= $csrf_token ?>" class="action-btn btn-danger"
+             onclick="return confirm('هل أنت متأكد من إلغاء هذه التذكرة؟');">
             <i class="fas fa-ban"></i> إلغاء
           </a>
         </td>
@@ -170,7 +162,5 @@ ob_start();
 </div>
 <?php
 $page_content = ob_get_clean();
-
-// إدراج القالب
 include __DIR__ . '/includes/layout.php';
 ?>
