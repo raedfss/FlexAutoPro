@@ -40,6 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
                 
                 $success_message = "تمت إضافة الإصدار بنجاح";
+                header("Location: version.php");
+                 exit;
+
             }
             
             // تعديل إصدار موجود
