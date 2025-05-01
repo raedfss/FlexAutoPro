@@ -50,14 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // إدخال البيانات في جدول التذاكر
             $stmt = $pdo->prepare("
                 INSERT INTO tickets 
-                (username, email, phone, car_type, chassis, service_type, status, created_at) 
+                (username, primary_email, phone, car_type, chassis, service_type, status, created_at) 
                 VALUES 
                 (:username, :email, :contact, :car_type, :vin, :service_type, 'pending', NOW())
             ");
             
             $stmt->execute([
                 'username' => $username,
-                'email' => $email,
+                'primary_email' => $email,
                 'contact' => $contact,
                 'car_type' => $car_type,
                 'vin' => $vin,
