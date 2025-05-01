@@ -4,75 +4,70 @@ require_once __DIR__ . '/includes/db.php';
 
 // التحقق إذا تم إرسال النموذج
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // التحقق من البيانات
-    $request_type = isset($_POST['request_type']) ? trim($_POST['request_type']) : '';
-    $custom_service = isset($_POST['custom_service']) ? trim($_POST['custom_service']) : '';
-    $car_type = isset($_POST['car_type']) ? trim($_POST['car_type']) : '';
-    $vin = isset($_POST['vin']) ? trim($_POST['vin']) : '';
-    $contact = isset($_POST['contact']) ? trim($_POST['contact']) : '';
-    
+    // استقبال القيم من النموذج
+    $request_type    = trim($_POST['request_type'] ?? '');
+    $custom_service  = trim($_POST['custom_service'] ?? '');
+    $car_type        = trim($_POST['car_type'] ?? '');
+    $vin             = trim($_POST['vin'] ?? '');
+    $contact         = trim($_POST['contact'] ?? '');
+
     $errors = [];
-    
-    // التحقق من اكتمال البيانات
+
+    // التحقق من القيم
     if (empty($request_type)) {
         $errors[] = "يرجى تحديد نوع الطلب";
     }
-    
     if ($request_type === 'custom' && empty($custom_service)) {
         $errors[] = "يرجى تحديد نوع الخدمة المطلوبة";
     }
-    
     if (empty($car_type)) {
         $errors[] = "يرجى إدخال نوع السيارة";
     }
-    
     if (empty($vin)) {
-        $errors[] = "يرجى إدخال رقم الشاسيه (VIN)";
+        $errors[] = "يرجى إدخال رقم الشاصي (VIN)";
     } elseif (strlen($vin) !== 17) {
-        $errors[] = "رقم الشاسيه يجب أن يتكون من 17 خانة بالضبط";
+        $errors[] = "رقم الشاصي يجب أن يتكون من 17 خانة بالضبط";
     }
-    
     if (empty($contact)) {
         $errors[] = "يرجى إدخال معلومات التواصل";
     }
-    
-    // إذا لم تكن هناك أخطاء، نحفظ البيانات
+
+    // إن لم تكن هناك أخطاء نُعالج الإدخال
     if (empty($errors)) {
         try {
-            // تجهيز البيانات للإدخال
             $service_type = ($request_type === 'key_code') 
-                ? 'طلب كود برمجة مفتاح' 
+                ? 'طلب كود برمجة مفتاح'
                 : 'طلب خدمة: ' . $custom_service;
-            
-            $username = isset($_SESSION['username']) ? $_SESSION['username'] : 'زائر';
-            $email = isset($_SESSION['email']) ? $_SESSION['email'] : '';
-            
-            // إدخال البيانات في جدول التذاكر
+
+            $username = $_SESSION['username'] ?? 'زائر';
+            $email    = $_SESSION['email'] ?? '';
+
             $stmt = $pdo->prepare("
                 INSERT INTO tickets 
                 (username, primary_email, phone, car_type, chassis, service_type, status, created_at) 
                 VALUES 
-                (:username, :email, :contact, :car_type, :vin, :service_type, 'pending', NOW())
+                (:username, :primary_email, :contact, :car_type, :vin, :service_type, 'pending', NOW())
             ");
-            
+
             $stmt->execute([
-                'username' => $username,
-                'primary_email' => $email,
-                'contact' => $contact,
-                'car_type' => $car_type,
-                'vin' => $vin,
-                'service_type' => $service_type
+                'username'       => $username,
+                'primary_email'  => $email,
+                'contact'        => $contact,
+                'car_type'       => $car_type,
+                'vin'            => $vin,
+                'service_type'   => $service_type
             ]);
-            
-            // توجيه المستخدم مع رسالة نجاح
+
+            // ✅ التوجيه مع رسالة نجاح
             header("Location: vin-database.php?status=success");
             exit;
-            
+
         } catch (PDOException $e) {
             $errors[] = "حدث خطأ أثناء معالجة طلبك: " . $e->getMessage();
         }
     }
 }
+
 
 // إعداد معلومات الصفحة
 $page_title = "خدمة قاعدة بيانات VIN";
