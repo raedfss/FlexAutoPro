@@ -3,8 +3,13 @@
 session_start();
 require_once __DIR__ . '/includes/db.php';
 
-// تعريف user_type بشكل آمن لمنع التحذير
-$user_type = isset($_SESSION['user_type']) ? $_SESSION['user_type'] : '';
+// وظيفة لتنظيف المدخلات
+function sanitize_input($data) {
+    $data = trim($data);
+    $data = stripslashes($data);
+    $data = htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
+    return $data;
+}
 
 // التحقق من تسجيل الدخول
 if (!isset($_SESSION['email'])) {
@@ -12,77 +17,179 @@ if (!isset($_SESSION['email'])) {
     exit;
 }
 
+// إنشاء أو استعادة توكن CSRF
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrf_token = $_SESSION['csrf_token'];
+
+// تعريف user_type بشكل آمن لمنع التحذير
+$user_type = isset($_SESSION['user_type']) ? sanitize_input($_SESSION['user_type']) : '';
+
 // إعدادات الصفحة
 $page_title = "تعديل برمجيات ECU";
 $hide_title = true;
 $success_message = '';
 $error_messages = [];
 
+// متغيرات للاحتفاظ بالمدخلات في حالة الخطأ
+$car_type = '';
+$chassis = '';
+$tuning_type = '';
+$notes = '';
+
 // معالجة الطلب
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $car_type = trim($_POST['car_type'] ?? '');
-    $chassis = trim($_POST['chassis'] ?? '');
-    $tuning_type = trim($_POST['tuning_type'] ?? '');
-    $notes = trim($_POST['notes'] ?? '');
-    $file_uploaded = false;
-    $file_path = '';
+    // التحقق من توكن CSRF
+    if (!isset($_POST['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $_POST['csrf_token'])) {
+        $error_messages[] = "خطأ في التحقق من الأمان. يرجى المحاولة مرة أخرى.";
+    } else {
+        // تنظيف المدخلات
+        $car_type = sanitize_input($_POST['car_type'] ?? '');
+        $chassis = sanitize_input($_POST['chassis'] ?? '');
+        $tuning_type = sanitize_input($_POST['tuning_type'] ?? '');
+        $notes = sanitize_input($_POST['notes'] ?? '');
+        $file_uploaded = false;
+        $file_path = '';
 
-    // تحقق من الحقول
-    if (empty($car_type)) $error_messages[] = "يرجى إدخال نوع السيارة";
-    if (empty($chassis)) {
-        $error_messages[] = "يرجى إدخال رقم الشاصي";
-    } elseif (strlen($chassis) !== 17) {
-        $error_messages[] = "رقم الشاصي يجب أن يتكون من 17 خانة بالضبط";
-    }
-    if (empty($tuning_type)) $error_messages[] = "يرجى اختيار نوع التعديل";
-
-    // معالجة الملف إذا تم رفعه
-    if (isset($_FILES['ecu_file']) && $_FILES['ecu_file']['error'] === UPLOAD_ERR_OK) {
-        $target_dir = __DIR__ . "/uploads/ecu_files/";
-        if (!is_dir($target_dir)) mkdir($target_dir, 0777, true);
-        $file_extension = pathinfo($_FILES['ecu_file']['name'], PATHINFO_EXTENSION);
-        $unique_name = uniqid('ecu_') . '_' . time() . '.' . $file_extension;
-        $target_file = $target_dir . $unique_name;
-
-        if (move_uploaded_file($_FILES['ecu_file']['tmp_name'], $target_file)) {
-            $file_uploaded = true;
-            $file_path = 'uploads/ecu_files/' . $unique_name;
-        } else {
-            $error_messages[] = "حدث خطأ أثناء رفع الملف";
+        // تحقق من الحقول
+        if (empty($car_type)) {
+            $error_messages[] = "يرجى إدخال نوع السيارة";
         }
-    }
+        
+        if (empty($chassis)) {
+            $error_messages[] = "يرجى إدخال رقم الشاصي";
+        } elseif (strlen($chassis) !== 17) {
+            $error_messages[] = "رقم الشاصي يجب أن يتكون من 17 خانة بالضبط";
+        } elseif (!preg_match('/^[A-HJ-NPR-Z0-9]{17}$/', $chassis)) {
+            $error_messages[] = "رقم الشاصي يحتوي على أحرف غير صالحة";
+        }
+        
+        if (empty($tuning_type)) {
+            $error_messages[] = "يرجى اختيار نوع التعديل";
+        } elseif (!in_array($tuning_type, ['Stage 1', 'Stage 2', 'Stage 3', 'Eco'])) {
+            $error_messages[] = "نوع التعديل غير صالح";
+        }
 
-    // إذا لا توجد أخطاء، أدخل التذكرة في قاعدة البيانات
-    if (empty($error_messages)) {
-        try {
-            $username = $_SESSION['username'] ?? 'مستخدم';
-            $email = $_SESSION['email'] ?? '';
-            $phone = $_SESSION['phone'] ?? '';
-            $service_type = "تعديل ECU: " . $tuning_type;
+        // معالجة الملف إذا تم رفعه
+        if (isset($_FILES['ecu_file']) && $_FILES['ecu_file']['error'] === UPLOAD_ERR_OK) {
+            // التحقق من نوع الملف
+            $allowed_extensions = ['bin', 'hex', 'zip', 'rar', 'pdf'];
+            $file_extension = strtolower(pathinfo($_FILES['ecu_file']['name'], PATHINFO_EXTENSION));
+            
+            if (!in_array($file_extension, $allowed_extensions)) {
+                $error_messages[] = "نوع الملف غير مسموح به. الأنواع المسموحة: " . implode(', ', $allowed_extensions);
+            } else {
+                // التحقق من حجم الملف (10MB كحد أقصى)
+                if ($_FILES['ecu_file']['size'] > 10 * 1024 * 1024) {
+                    $error_messages[] = "حجم الملف كبير جدًا. الحد الأقصى هو 10 ميجابايت";
+                } else {
+                    $target_dir = __DIR__ . "/uploads/ecu_files/";
+                    
+                    // إنشاء المجلد إذا لم يكن موجودًا
+                    if (!is_dir($target_dir)) {
+                        mkdir($target_dir, 0755, true);
+                    }
+                    
+                    // إنشاء اسم ملف آمن وفريد
+                    $unique_name = 'ecu_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $file_extension;
+                    $target_file = $target_dir . $unique_name;
+                    
+                    if (move_uploaded_file($_FILES['ecu_file']['tmp_name'], $target_file)) {
+                        $file_uploaded = true;
+                        $file_path = 'uploads/ecu_files/' . $unique_name;
+                    } else {
+                        $error_messages[] = "حدث خطأ أثناء رفع الملف";
+                    }
+                }
+            }
+        }
 
-            $stmt = $pdo->prepare("
-                INSERT INTO tickets 
-                (username, email, phone, car_type, chassis, service_type, notes, file_path, status, created_at) 
-                VALUES 
-                (:username, :email, :phone, :car_type, :chassis, :service_type, :notes, :file_path, 'pending', NOW())
-            ");
+        // إذا لا توجد أخطاء، أدخل التذكرة في قاعدة البيانات
+        if (empty($error_messages)) {
+            try {
+                $username = sanitize_input($_SESSION['username'] ?? 'مستخدم');
+                $email = filter_var($_SESSION['email'] ?? '', FILTER_SANITIZE_EMAIL);
+                $phone = sanitize_input($_SESSION['phone'] ?? '');
+                $service_type = "تعديل ECU: " . $tuning_type;
 
-            $stmt->execute([
-                'username' => $username,
-                'email' => $email,
-                'phone' => $phone,
-                'car_type' => $car_type,
-                'chassis' => $chassis,
-                'service_type' => $service_type,
-                'notes' => $notes,
-                'file_path' => $file_path
-            ]);
+                // تحقق من وجود حقل status في جدول tickets
+                $check_column = $pdo->query("
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'tickets' AND column_name = 'status'
+                ");
+                
+                $has_status_column = $check_column->rowCount() > 0;
 
-            $success_message = "تم إرسال طلب تعديل ECU بنجاح. سنتواصل معك قريباً.";
-            // إفراغ البيانات بعد النجاح
-            $car_type = $chassis = $tuning_type = $notes = '';
-        } catch (PDOException $e) {
-            $error_messages[] = "حدث خطأ أثناء معالجة طلبك: " . $e->getMessage();
+                // بناء استعلام الإدراج
+                if ($has_status_column) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO tickets 
+                        (username, email, phone, car_type, chassis, service_type, notes, file_path, status, created_at, ip_address) 
+                        VALUES 
+                        (:username, :email, :phone, :car_type, :chassis, :service_type, :notes, :file_path, 'pending', NOW(), :ip_address)
+                    ");
+                } else {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO tickets 
+                        (username, email, phone, car_type, chassis, service_type, notes, file_path, created_at, ip_address) 
+                        VALUES 
+                        (:username, :email, :phone, :car_type, :chassis, :service_type, :notes, :file_path, NOW(), :ip_address)
+                    ");
+                }
+
+                // تنفيذ الاستعلام
+                $stmt->execute([
+                    'username' => $username,
+                    'email' => $email,
+                    'phone' => $phone,
+                    'car_type' => $car_type,
+                    'chassis' => $chassis,
+                    'service_type' => $service_type,
+                    'notes' => $notes,
+                    'file_path' => $file_path,
+                    'ip_address' => $_SERVER['REMOTE_ADDR']
+                ]);
+
+                // الحصول على معرف التذكرة
+                $ticket_id = $pdo->lastInsertId();
+
+                // تجديد توكن CSRF بعد النجاح
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+                $csrf_token = $_SESSION['csrf_token'];
+
+                // رسالة النجاح
+                $success_message = "تم إرسال طلب تعديل ECU بنجاح. رقم طلبك هو: FLEX-" . str_pad($ticket_id, 5, '0', STR_PAD_LEFT);
+                
+                // إفراغ البيانات بعد النجاح
+                $car_type = $chassis = $tuning_type = $notes = '';
+
+                // إرسال بريد تنبيه للإدارة (اختياري)
+                $admin_email = "admin@flexauto.com";
+                $subject = "طلب تعديل ECU جديد - FlexAuto";
+                $message = "تم استلام طلب تعديل ECU جديد:\n\n";
+                $message .= "رقم الطلب: FLEX-" . str_pad($ticket_id, 5, '0', STR_PAD_LEFT) . "\n";
+                $message .= "العميل: " . $username . "\n";
+                $message .= "البريد الإلكتروني: " . $email . "\n";
+                $message .= "الهاتف: " . $phone . "\n";
+                $message .= "نوع السيارة: " . $car_type . "\n";
+                $message .= "رقم الشاصي: " . $chassis . "\n";
+                $message .= "نوع التعديل: " . $tuning_type . "\n";
+                $message .= "تم رفع ملف: " . ($file_uploaded ? "نعم" : "لا") . "\n";
+                
+                // إضافة رأس إضافية
+                $headers = "From: noreply@flexauto.com" . "\r\n";
+                $headers .= "Reply-To: " . $email . "\r\n";
+                
+                // محاولة إرسال البريد
+                @mail($admin_email, $subject, $message, $headers);
+
+            } catch (PDOException $e) {
+                // تسجيل الخطأ في ملف سجل بدلاً من عرضه للمستخدم
+                error_log("ECU Tuning Error: " . $e->getMessage());
+                $error_messages[] = "حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى لاحقًا.";
+            }
         }
     }
 }
@@ -301,6 +408,54 @@ $page_css = '
         color: #f8fafc;
     }
     
+    .alert {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: flex-start;
+    }
+    
+    .alert-success {
+        background-color: rgba(0, 255, 136, 0.1);
+        border: 1px solid rgba(0, 255, 136, 0.3);
+        color: #00ff88;
+    }
+    
+    .alert-error {
+        background-color: rgba(255, 107, 107, 0.1);
+        border: 1px solid rgba(255, 107, 107, 0.3);
+        color: #ff6b6b;
+    }
+    
+    .alert i {
+        margin-left: 10px;
+        font-size: 20px;
+    }
+    
+    .alert ul {
+        margin: 10px 25px 0 0;
+        padding-right: 0;
+    }
+    
+    .alert ul li {
+        margin-bottom: 5px;
+    }
+    
+    .vin-validation {
+        margin-top: 5px;
+        font-size: 14px;
+        transition: all 0.3s;
+    }
+    
+    .vin-valid {
+        color: #00ff88;
+    }
+    
+    .vin-invalid {
+        color: #ff6b6b;
+    }
+    
     @media (max-width: 768px) {
         .ecu-tuning-container {
             padding: 15px;
@@ -340,18 +495,22 @@ ob_start();
     
     <?php if (!empty($success_message)): ?>
         <div class="alert alert-success">
-            <strong>تم بنجاح!</strong> <?php echo $success_message; ?>
+            <i class="fas fa-check-circle"></i>
+            <div><?= htmlspecialchars($success_message) ?></div>
         </div>
     <?php endif; ?>
     
     <?php if (!empty($error_messages)): ?>
         <div class="alert alert-error">
-            <strong>خطأ:</strong>
-            <ul>
-                <?php foreach ($error_messages as $error): ?>
-                    <li><?php echo $error; ?></li>
-                <?php endforeach; ?>
-            </ul>
+            <i class="fas fa-exclamation-circle"></i>
+            <div>
+                <strong>خطأ:</strong>
+                <ul>
+                    <?php foreach ($error_messages as $error): ?>
+                        <li><?= htmlspecialchars($error) ?></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
         </div>
     <?php endif; ?>
     
@@ -367,34 +526,38 @@ ob_start();
     </div>
     
     <div class="ecu-form">
-        <form method="POST" action="" enctype="multipart/form-data">
+        <form method="POST" action="" enctype="multipart/form-data" id="ecu-form">
+            <!-- إضافة توكن CSRF للحماية -->
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+            
             <div class="form-group">
                 <label for="car_type">نوع السيارة</label>
-                <input type="text" id="car_type" name="car_type" placeholder="مثال: تويوتا كامري 2022" value="<?php echo htmlspecialchars($car_type ?? ''); ?>" required>
+                <input type="text" id="car_type" name="car_type" placeholder="مثال: تويوتا كامري 2022" value="<?= htmlspecialchars($car_type) ?>" required>
             </div>
             
             <div class="form-group">
                 <label for="chassis">رقم الشاصي (VIN)</label>
-                <input type="text" id="chassis" name="chassis" placeholder="يرجى إدخال رقم الشاصي المكون من 17 خانة" minlength="17" maxlength="17" value="<?php echo htmlspecialchars($chassis ?? ''); ?>" required>
+                <input type="text" id="chassis" name="chassis" placeholder="يرجى إدخال رقم الشاصي المكون من 17 خانة" minlength="17" maxlength="17" value="<?= htmlspecialchars($chassis) ?>" required>
+                <div id="vin_validation" class="vin-validation"></div>
             </div>
             
             <div class="form-group">
                 <label>نوع التعديل</label>
                 <div class="tuning-types">
-                    <label class="tuning-type-option">
-                        <input type="radio" name="tuning_type" value="Stage 1" <?php echo ($tuning_type ?? '') === 'Stage 1' ? 'checked' : ''; ?> required>
+                    <label class="tuning-type-option <?= $tuning_type === 'Stage 1' ? 'selected' : '' ?>">
+                        <input type="radio" name="tuning_type" value="Stage 1" <?= $tuning_type === 'Stage 1' ? 'checked' : '' ?> required>
                         <span>Stage 1 - تعديل أساسي</span>
                     </label>
-                    <label class="tuning-type-option">
-                        <input type="radio" name="tuning_type" value="Stage 2" <?php echo ($tuning_type ?? '') === 'Stage 2' ? 'checked' : ''; ?>>
+                    <label class="tuning-type-option <?= $tuning_type === 'Stage 2' ? 'selected' : '' ?>">
+                        <input type="radio" name="tuning_type" value="Stage 2" <?= $tuning_type === 'Stage 2' ? 'checked' : '' ?>>
                         <span>Stage 2 - تعديل متوسط</span>
                     </label>
-                    <label class="tuning-type-option">
-                        <input type="radio" name="tuning_type" value="Stage 3" <?php echo ($tuning_type ?? '') === 'Stage 3' ? 'checked' : ''; ?>>
+                    <label class="tuning-type-option <?= $tuning_type === 'Stage 3' ? 'selected' : '' ?>">
+                        <input type="radio" name="tuning_type" value="Stage 3" <?= $tuning_type === 'Stage 3' ? 'checked' : '' ?>>
                         <span>Stage 3 - تعديل متقدم</span>
                     </label>
-                    <label class="tuning-type-option">
-                        <input type="radio" name="tuning_type" value="Eco" <?php echo ($tuning_type ?? '') === 'Eco' ? 'checked' : ''; ?>>
+                    <label class="tuning-type-option <?= $tuning_type === 'Eco' ? 'selected' : '' ?>">
+                        <input type="radio" name="tuning_type" value="Eco" <?= $tuning_type === 'Eco' ? 'checked' : '' ?>>
                         <span>Eco - توفير الوقود</span>
                     </label>
                 </div>
@@ -402,16 +565,16 @@ ob_start();
             
             <div class="form-group">
                 <label for="ecu_file">ملف ECU (اختياري)</label>
-                <input type="file" id="ecu_file" name="ecu_file" class="file-input">
-                <small>يمكنك رفع نسخة من ملف ECU الحالي إذا كان متوفراً لديك</small>
+                <input type="file" id="ecu_file" name="ecu_file" class="file-input" accept=".bin,.hex,.zip,.rar,.pdf">
+                <small>يمكنك رفع نسخة من ملف ECU الحالي إذا كان متوفراً لديك. الأنواع المدعومة: bin, hex, zip, rar, pdf (الحد الأقصى: 10MB)</small>
             </div>
             
             <div class="form-group">
                 <label for="notes">ملاحظات إضافية</label>
-                <textarea id="notes" name="notes" rows="5" placeholder="أي معلومات إضافية ترغب في إضافتها حول طلبك"><?php echo htmlspecialchars($notes ?? ''); ?></textarea>
+                <textarea id="notes" name="notes" rows="5" placeholder="أي معلومات إضافية ترغب في إضافتها حول طلبك"><?= htmlspecialchars($notes) ?></textarea>
             </div>
             
-            <button type="submit">إرسال طلب التعديل</button>
+            <button type="submit" id="submit-btn">إرسال طلب التعديل</button>
         </form>
     </div>
 </div>
@@ -419,6 +582,7 @@ ob_start();
 <script>
     // تحسين تجربة المستخدم عند اختيار نوع التعديل
     document.addEventListener('DOMContentLoaded', function() {
+        // التعامل مع خيارات التعديل
         const tuningOptions = document.querySelectorAll('.tuning-type-option');
         
         tuningOptions.forEach(option => {
@@ -436,10 +600,105 @@ ob_start();
                 radio.checked = true;
             });
         });
+        
+        // التحقق من صحة رقم الشاصي (VIN)
+        const chassisInput = document.getElementById('chassis');
+        const vinValidation = document.getElementById('vin_validation');
+        
+        if (chassisInput) {
+            chassisInput.addEventListener('input', function() {
+                // تحويل الأحرف إلى أحرف كبيرة وإزالة المسافات
+                this.value = this.value.toUpperCase().replace(/\s/g, '');
+                
+                // استبدال الأحرف غير المسموح بها في VIN (I, O, Q)
+                this.value = this.value.replace(/[IOQ]/g, '');
+                
+                const vin = this.value.trim();
+                
+                if (vin.length === 0) {
+                    vinValidation.textContent = '';
+                    vinValidation.className = 'vin-validation';
+                } else if (vin.length === 17) {
+                    // التحقق من صحة تنسيق VIN
+                    const vinRegex = /^[A-HJ-NPR-Z0-9]{17}$/;
+                    if (vinRegex.test(vin)) {
+                        vinValidation.textContent = '✓ رقم الشاصي صحيح (17 خانة)';
+                        vinValidation.className = 'vin-validation vin-valid';
+                    } else {
+                        vinValidation.textContent = '✗ رقم الشاصي يحتوي على أحرف غير صالحة';
+                        vinValidation.className = 'vin-validation vin-invalid';
+                    }
+                } else {
+                    vinValidation.textContent = '✗ رقم الشاصي يجب أن يتكون من 17 خانة بالضبط (الآن: ' + vin.length + ' خانة)';
+                    vinValidation.className = 'vin-validation vin-invalid';
+                }
+            });
+            
+            // تشغيل التحقق عند تحميل الصفحة إذا كانت هناك قيمة
+            if (chassisInput.value.length > 0) {
+                chassisInput.dispatchEvent(new Event('input'));
+            }
+        }
+        
+        // منع إرسال النموذج مرتين
+        const form = document.getElementById('ecu-form');
+        const submitBtn = document.getElementById('submit-btn');
+        
+        if (form && submitBtn) {
+            form.addEventListener('submit', function() {
+                // التحقق من صحة رقم الشاصي قبل الإرسال
+                const chassisValue = chassisInput.value.trim();
+                if (chassisValue.length !== 17) {
+                    vinValidation.textContent = '✗ رقم الشاصي يجب أن يتكون من 17 خانة بالضبط';
+                    vinValidation.className = 'vin-validation vin-invalid';
+                    chassisInput.focus();
+                    return false;
+                }
+                
+                // تعطيل زر الإرسال بعد النقر
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإرسال...';
+            });
+        }
+        
+        // إخفاء رسائل التنبيه تلقائياً بعد 8 ثوانٍ
+        const alerts = document.querySelectorAll('.alert');
+        if (alerts.length) {
+            setTimeout(() => {
+                alerts.forEach(alert => {
+                    alert.style.opacity = '0';
+                    alert.style.transition = 'opacity 0.5s';
+                    setTimeout(() => {
+                        alert.style.display = 'none';
+                    }, 500);
+                });
+            }, 8000);
+        }
+        
+        // التحقق من حجم الملف قبل الإرسال
+        const fileInput = document.getElementById('ecu_file');
+        if (fileInput) {
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    const fileSize = this.files[0].size; // بالبايت
+                    const maxSize = 10 * 1024 * 1024; // 10 ميجابايت
+                    
+                    if (fileSize > maxSize) {
+                        alert('حجم الملف كبير جدًا. الحد الأقصى هو 10 ميجابايت.');
+                        this.value = ''; // مسح الملف المحدد
+                    }
+                    
+                    // التحقق من امتداد الملف
+                    const fileName = this.files[0].name;
+                    const fileExt = fileName.split('.').pop().toLowerCase();
+                    const allowedExts = ['bin', 'hex', 'zip', 'rar', 'pdf'];
+                    
+                    if (!allowedExts.includes(fileExt)) {
+                        alert('نوع الملف غير مسموح به. الأنواع المسموحة: ' + allowedExts.join(', '));
+                        this.value = ''; // مسح الملف المحدد
+                    }
+                }
+            });
+        }
     });
 </script>
-
-<?php
-$page_content = ob_get_clean();
-require_once __DIR__ . '/includes/layout.php';
-?>

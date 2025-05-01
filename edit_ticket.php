@@ -1,5 +1,7 @@
 <?php
 session_start();
+
+// التحقق من تسجيل الدخول
 if (!isset($_SESSION['email'])) {
     header("Location: login.php");
     exit;
@@ -7,52 +9,129 @@ if (!isset($_SESSION['email'])) {
 
 require_once 'includes/db.php';
 
-if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
-    die("معرف التذكرة غير صالح.");
+// وظيفة لتنظيف المدخلات
+function sanitize_input($data) {
+    $data = trim($data);
+    $data = stripslashes($data);
+    $data = htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
+    return $data;
 }
 
-$ticket_id = intval($_GET['id']);
-$username = $_SESSION['username'];
+// إنشاء أو استعادة توكن CSRF
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrf_token = $_SESSION['csrf_token'];
 
-// جلب بيانات التذكرة
-$stmt = $pdo->prepare("SELECT * FROM tickets WHERE id = ? AND username = ?");
-$stmt->execute([$ticket_id, $username]);
-$ticket = $stmt->fetch(PDO::FETCH_ASSOC);
-
-if (!$ticket) {
-    die("لم يتم العثور على التذكرة.");
+// التحقق من صحة معرف التذكرة
+if (!isset($_GET['id']) || !filter_var($_GET['id'], FILTER_VALIDATE_INT)) {
+    $_SESSION['error_message'] = "معرف التذكرة غير صالح.";
+    header("Location: my_tickets.php");
+    exit;
 }
 
-// عند إرسال النموذج
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $service_type = trim($_POST['service_type']);
-    $car_type = trim($_POST['car_type']);
-    $chassis = trim($_POST['chassis']);
-    $additional_info = trim($_POST['additional_info']);
+$ticket_id = filter_var($_GET['id'], FILTER_VALIDATE_INT);
+$username = sanitize_input($_SESSION['username']);
 
-    if ($service_type && $car_type && $chassis) {
+// التحقق من وجود رسالة خطأ من محاولة سابقة
+$error = isset($_SESSION['edit_ticket_error']) ? $_SESSION['edit_ticket_error'] : null;
+unset($_SESSION['edit_ticket_error']);
+
+try {
+    // جلب بيانات التذكرة بطريقة آمنة
+    $stmt = $pdo->prepare("SELECT * FROM tickets WHERE id = ? AND username = ?");
+    $stmt->execute([$ticket_id, $username]);
+    $ticket = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$ticket) {
+        $_SESSION['error_message'] = "لم يتم العثور على التذكرة أو ليس لديك صلاحية الوصول إليها.";
+        header("Location: my_tickets.php");
+        exit;
+    }
+
+    // عند إرسال النموذج
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // التحقق من توكن CSRF
+        if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+            throw new Exception("خطأ في التحقق من الأمان. يرجى المحاولة مرة أخرى.");
+        }
+
+        // تنظيف وتحقق من المدخلات
+        $service_type = sanitize_input($_POST['service_type'] ?? '');
+        $car_type = sanitize_input($_POST['car_type'] ?? '');
+        $chassis = sanitize_input($_POST['chassis'] ?? '');
+        $additional_info = sanitize_input($_POST['additional_info'] ?? '');
+
+        // التحقق من الحقول المطلوبة
+        if (empty($service_type)) {
+            throw new Exception("نوع الخدمة مطلوب.");
+        }
+        
+        if (empty($car_type)) {
+            throw new Exception("نوع السيارة مطلوب.");
+        }
+        
+        if (empty($chassis)) {
+            throw new Exception("رقم الشاصي مطلوب.");
+        } elseif (strlen($chassis) !== 17) {
+            throw new Exception("رقم الشاصي يجب أن يتكون من 17 خانة بالضبط.");
+        }
+
+        // تحديث البيانات
         $update_stmt = $pdo->prepare("
             UPDATE tickets 
-            SET service_type = ?, car_type = ?, chassis = ?, additional_info = ? 
+            SET service_type = ?, car_type = ?, chassis = ?, additional_info = ?, updated_at = NOW()
             WHERE id = ? AND username = ?
         ");
-        $update_stmt->execute([$service_type, $car_type, $chassis, $additional_info, $ticket_id, $username]);
-        header("Location: my_tickets.php?success=1");
-        exit;
-    } else {
-        $error = "جميع الحقول مطلوبة باستثناء الملاحظات.";
-    }
-}
-?>
+        
+        $update_result = $update_stmt->execute([
+            $service_type, 
+            $car_type, 
+            $chassis, 
+            $additional_info, 
+            $ticket_id, 
+            $username
+        ]);
 
+        if (!$update_result) {
+            throw new Exception("حدث خطأ أثناء تحديث بيانات التذكرة.");
+        }
+
+        // تجديد توكن CSRF بعد الإرسال الناجح
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+        
+        // تعيين رسالة نجاح
+        $_SESSION['success_message'] = "تم تحديث بيانات التذكرة بنجاح.";
+        
+        header("Location: my_tickets.php");
+        exit;
+    }
+} catch (Exception $e) {
+    // تسجيل الخطأ في ملف سجل
+    error_log("Error updating ticket #$ticket_id: " . $e->getMessage());
+    
+    // تخزين رسالة الخطأ في الجلسة
+    $_SESSION['edit_ticket_error'] = $e->getMessage();
+    
+    // إعادة تحميل الصفحة مع رسالة الخطأ
+    header("Location: edit_ticket.php?id=$ticket_id");
+    exit;
+}
+
+// تحديد عنوان الصفحة
+$page_title = "تعديل التذكرة | FlexAuto";
+?>
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تعديل التذكرة | FlexAuto</title>
+    <title><?= htmlspecialchars($page_title) ?></title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet"
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- تعزيز الأمان للمتصفح -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <meta http-equiv="X-Frame-Options" content="DENY">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; script-src 'self'; font-src https://cdnjs.cloudflare.com; img-src 'self' data:;">
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, sans-serif;
@@ -157,6 +236,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             border: 1px solid rgba(0, 255, 255, 0.3);
         }
 
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        .alert-danger {
+            background: rgba(255, 77, 77, 0.2);
+            border: 1px solid rgba(255, 77, 77, 0.3);
+        }
+
+        .vin-validation {
+            color: #64748b;
+            font-size: 0.9rem;
+            margin-top: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .vin-valid {
+            color: #00ff88;
+        }
+
+        .vin-invalid {
+            color: #ff6b6b;
+        }
+
         footer {
             background-color: rgba(0, 0, 0, 0.9);
             color: #eee;
@@ -193,23 +299,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <h1>تعديل بيانات التذكرة</h1>
 
         <?php if (isset($error)): ?>
-            <div style="background-color: #ff4d4d; padding: 10px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
-                <?= htmlspecialchars($error) ?>
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?>
             </div>
         <?php endif; ?>
 
-        <form method="post">
+        <form method="post" id="edit_ticket_form">
+            <!-- إضافة توكن CSRF للحماية -->
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+            
             <label for="service_type">نوع الخدمة</label>
-            <input type="text" id="service_type" name="service_type" value="<?= htmlspecialchars($ticket['service_type']) ?>" required>
+            <input type="text" id="service_type" name="service_type" value="<?= htmlspecialchars($ticket['service_type'] ?? '') ?>" required>
 
             <label for="car_type">نوع السيارة</label>
-            <input type="text" id="car_type" name="car_type" value="<?= htmlspecialchars($ticket['car_type']) ?>" required>
+            <input type="text" id="car_type" name="car_type" value="<?= htmlspecialchars($ticket['car_type'] ?? '') ?>" required>
 
             <label for="chassis">رقم الشاسيه</label>
-            <input type="text" id="chassis" name="chassis" value="<?= htmlspecialchars($ticket['chassis']) ?>" required>
+            <input type="text" id="chassis" name="chassis" value="<?= htmlspecialchars($ticket['chassis'] ?? '') ?>" maxlength="17" required>
+            <div id="vin_validation" class="vin-validation"></div>
 
             <label for="additional_info">ملاحظات إضافية</label>
-            <textarea id="additional_info" name="additional_info" rows="4"><?= htmlspecialchars($ticket['additional_info']) ?></textarea>
+            <textarea id="additional_info" name="additional_info" rows="4"><?= htmlspecialchars($ticket['additional_info'] ?? '') ?></textarea>
 
             <div class="buttons">
                 <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> حفظ التعديلات</button>
@@ -225,6 +335,70 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div style="margin-top: 8px;">📧 raedfss@hotmail.com | ☎️ +962796519007</div>
     <div style="margin-top: 5px;">&copy; <?= date('Y') ?> FlexAuto. جميع الحقوق محفوظة.</div>
 </footer>
+
+<script>
+// التحقق من صحة رقم الشاصي (VIN)
+document.addEventListener('DOMContentLoaded', function() {
+    const chassisInput = document.getElementById('chassis');
+    const vinValidation = document.getElementById('vin_validation');
+    const form = document.getElementById('edit_ticket_form');
+    
+    // مراقبة إدخال رقم الشاصي للتحقق
+    if(chassisInput) {
+        chassisInput.addEventListener('input', function() {
+            // تحويل الأحرف إلى أحرف كبيرة وإزالة المسافات
+            this.value = this.value.toUpperCase().replace(/\s/g, '');
+            
+            // استبدال الأحرف غير المسموح بها في VIN (I, O, Q)
+            this.value = this.value.replace(/[IOQ]/g, '');
+            
+            const vin = this.value.trim();
+            
+            if(vin.length === 0) {
+                vinValidation.textContent = '';
+                vinValidation.className = 'vin-validation';
+            } else if(vin.length === 17) {
+                // التحقق من صحة تنسيق VIN
+                const vinRegex = /^[A-HJ-NPR-Z0-9]{17}$/;
+                if(vinRegex.test(vin)) {
+                    vinValidation.textContent = '✓ رقم الشاصي صحيح (17 خانة)';
+                    vinValidation.className = 'vin-validation vin-valid';
+                } else {
+                    vinValidation.textContent = '✗ رقم الشاصي يحتوي على أحرف غير صالحة';
+                    vinValidation.className = 'vin-validation vin-invalid';
+                }
+            } else {
+                vinValidation.textContent = '✗ رقم الشاصي يجب أن يتكون من 17 خانة بالضبط (الآن: ' + vin.length + ' خانة)';
+                vinValidation.className = 'vin-validation vin-invalid';
+            }
+        });
+        
+        // تشغيل التحقق عند تحميل الصفحة
+        chassisInput.dispatchEvent(new Event('input'));
+    }
+    
+    // منع إرسال النموذج مرتين
+    if(form) {
+        form.addEventListener('submit', function() {
+            // التحقق من صحة رقم الشاصي قبل الإرسال
+            const vin = chassisInput.value.trim();
+            if (vin.length !== 17) {
+                vinValidation.textContent = '✗ رقم الشاصي يجب أن يتكون من 17 خانة بالضبط';
+                vinValidation.className = 'vin-validation vin-invalid';
+                chassisInput.focus();
+                return false;
+            }
+            
+            // تعطيل زر الإرسال بعد النقر
+            const submitBtn = document.querySelector('.btn-primary');
+            if(submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الحفظ...';
+            }
+        });
+    }
+});
+</script>
 
 </body>
 </html>
