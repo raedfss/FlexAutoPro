@@ -15,7 +15,11 @@ if (!isset($_SESSION['csrf_token'])) {
 $csrf_token = $_SESSION['csrf_token'];
 
 // التحقق من تنفيذ mark_seen
-if (isset($_GET['mark_seen'], $_GET['csrf']) && is_numeric($_GET['mark_seen']) && hash_equals($_SESSION['csrf_token'], $_GET['csrf'])) {
+if (isset($_GET['mark_seen'])) {
+    if (!isset($_GET['csrf']) || !hash_equals($_SESSION['csrf_token'], $_GET['csrf'])) {
+        die("🚫 طلب غير صالح (رمز الحماية CSRF مفقود أو غير مطابق).");
+    }
+
     $id = (int) $_GET['mark_seen'];
     $stmt = $pdo->prepare("UPDATE tickets SET is_seen = TRUE WHERE id = :id");
     $stmt->execute(['id' => $id]);
@@ -24,7 +28,11 @@ if (isset($_GET['mark_seen'], $_GET['csrf']) && is_numeric($_GET['mark_seen']) &
 }
 
 // التحقق من تنفيذ cancel_ticket
-if (isset($_GET['cancel_ticket'], $_GET['csrf']) && is_numeric($_GET['cancel_ticket']) && hash_equals($_SESSION['csrf_token'], $_GET['csrf'])) {
+if (isset($_GET['cancel_ticket'])) {
+    if (!isset($_GET['csrf']) || !hash_equals($_SESSION['csrf_token'], $_GET['csrf'])) {
+        die("🚫 لا يمكن تنفيذ العملية. رمز الحماية CSRF غير صحيح.");
+    }
+
     $id = (int) $_GET['cancel_ticket'];
     $stmt = $pdo->prepare("UPDATE tickets SET status = 'cancelled' WHERE id = :id");
     $stmt->execute(['id' => $id]);
