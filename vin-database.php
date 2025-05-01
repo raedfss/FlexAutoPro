@@ -2,68 +2,125 @@
 session_start();
 require_once __DIR__ . '/includes/db.php';
 
+// إنشاء أو استعادة توكن CSRF
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+$csrf_token = $_SESSION['csrf_token'];
+
+// وظيفة لتنظيف المدخلات
+function sanitize_input($data) {
+    $data = trim($data);
+    $data = stripslashes($data);
+    $data = htmlspecialchars($data, ENT_QUOTES, 'UTF-8');
+    return $data;
+}
+
+// مصفوفة لحفظ الأخطاء
+$errors = [];
+$success_message = '';
+
 // التحقق إذا تم إرسال النموذج
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // استقبال القيم من النموذج
-    $request_type    = trim($_POST['request_type'] ?? '');
-    $custom_service  = trim($_POST['custom_service'] ?? '');
-    $car_type        = trim($_POST['car_type'] ?? '');
-    $vin             = trim($_POST['vin'] ?? '');
-    $contact         = trim($_POST['contact'] ?? '');
+    // التحقق من توكن CSRF
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
+        $errors[] = "خطأ في التحقق من الأمان. يرجى المحاولة مرة أخرى.";
+    } else {
+        // تنظيف وتحقق من المدخلات
+        $request_type = isset($_POST['request_type']) ? sanitize_input($_POST['request_type']) : '';
+        $custom_service = isset($_POST['custom_service']) ? sanitize_input($_POST['custom_service']) : '';
+        $car_type = isset($_POST['car_type']) ? sanitize_input($_POST['car_type']) : '';
+        $vin = isset($_POST['vin']) ? sanitize_input($_POST['vin']) : '';
+        $contact = isset($_POST['contact']) ? sanitize_input($_POST['contact']) : '';
 
-    $errors = [];
+        // التحقق من القيم
+        if (empty($request_type)) {
+            $errors[] = "يرجى تحديد نوع الطلب";
+        } elseif (!in_array($request_type, ['key_code', 'custom'])) {
+            $errors[] = "نوع الطلب غير صالح";
+        }
+        
+        if ($request_type === 'custom' && empty($custom_service)) {
+            $errors[] = "يرجى تحديد نوع الخدمة المطلوبة";
+        }
+        
+        if (empty($car_type)) {
+            $errors[] = "يرجى إدخال نوع السيارة";
+        }
+        
+        if (empty($vin)) {
+            $errors[] = "يرجى إدخال رقم الشاصي (VIN)";
+        } elseif (strlen($vin) !== 17) {
+            $errors[] = "رقم الشاصي يجب أن يتكون من 17 خانة بالضبط";
+        } elseif (!preg_match('/^[A-HJ-NPR-Z0-9]{17}$/', $vin)) {
+            // التحقق من صحة تنسيق VIN (بدون الأحرف I, O, Q)
+            $errors[] = "رقم الشاصي يحتوي على أحرف غير صالحة";
+        }
+        
+        if (empty($contact)) {
+            $errors[] = "يرجى إدخال معلومات التواصل";
+        }
 
-    // التحقق من القيم
-    if (empty($request_type)) {
-        $errors[] = "يرجى تحديد نوع الطلب";
-    }
-    if ($request_type === 'custom' && empty($custom_service)) {
-        $errors[] = "يرجى تحديد نوع الخدمة المطلوبة";
-    }
-    if (empty($car_type)) {
-        $errors[] = "يرجى إدخال نوع السيارة";
-    }
-    if (empty($vin)) {
-        $errors[] = "يرجى إدخال رقم الشاصي (VIN)";
-    } elseif (strlen($vin) !== 17) {
-        $errors[] = "رقم الشاصي يجب أن يتكون من 17 خانة بالضبط";
-    }
-    if (empty($contact)) {
-        $errors[] = "يرجى إدخال معلومات التواصل";
-    }
+        // إن لم تكن هناك أخطاء نُعالج الإدخال
+        if (empty($errors)) {
+            try {
+                $service_type = ($request_type === 'key_code') 
+                    ? 'طلب كود برمجة مفتاح'
+                    : 'طلب خدمة: ' . $custom_service;
 
-    // إن لم تكن هناك أخطاء نُعالج الإدخال
-    if (empty($errors)) {
-        try {
-            $service_type = ($request_type === 'key_code') 
-                ? 'طلب كود برمجة مفتاح'
-                : 'طلب خدمة: ' . $custom_service;
+                $username = isset($_SESSION['username']) ? sanitize_input($_SESSION['username']) : 'زائر';
+                $email = isset($_SESSION['email']) ? sanitize_input($_SESSION['email']) : '';
 
-            $username = $_SESSION['username'] ?? 'زائر';
-            $email    = $_SESSION['email'] ?? '';
+                // التحقق من وجود عمود status قبل الإدراج
+                $check_column = $pdo->query("
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'tickets' AND column_name = 'status'
+                ");
+                
+                $has_status_column = $check_column->rowCount() > 0;
+                
+                // بناء استعلام الإدراج بناءً على وجود العمود
+                if ($has_status_column) {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO tickets 
+                        (username, primary_email, phone, car_type, chassis, service_type, status, created_at) 
+                        VALUES 
+                        (:username, :primary_email, :contact, :car_type, :vin, :service_type, 'pending', NOW())
+                    ");
+                } else {
+                    $stmt = $pdo->prepare("
+                        INSERT INTO tickets 
+                        (username, primary_email, phone, car_type, chassis, service_type, created_at) 
+                        VALUES 
+                        (:username, :primary_email, :contact, :car_type, :vin, :service_type, NOW())
+                    ");
+                }
 
-            $stmt = $pdo->prepare("
-                INSERT INTO tickets 
-                (username, primary_email, phone, car_type, chassis, service_type, status, created_at) 
-                VALUES 
-                (:username, :primary_email, :contact, :car_type, :vin, :service_type, 'pending', NOW())
-            ");
+                $stmt->execute([
+                    'username'       => $username,
+                    'primary_email'  => $email,
+                    'contact'        => $contact,
+                    'car_type'       => $car_type,
+                    'vin'            => $vin,
+                    'service_type'   => $service_type
+                ]);
 
-            $stmt->execute([
-                'username'       => $username,
-                'primary_email'  => $email,
-                'contact'        => $contact,
-                'car_type'       => $car_type,
-                'vin'            => $vin,
-                'service_type'   => $service_type
-            ]);
+                // تجديد توكن CSRF بعد الإرسال الناجح
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+                $csrf_token = $_SESSION['csrf_token'];
+                
+                // تعيين رسالة النجاح
+                $success_message = "تم استلام طلبك بنجاح. سيتواصل معك فريق FlexAuto خلال وقت قصير لتزويدك بالتفاصيل.";
+                
+                // تفريغ قيم المدخلات بعد الإرسال الناجح
+                $request_type = $custom_service = $car_type = $vin = $contact = '';
 
-            // ✅ التوجيه مع رسالة نجاح
-            header("Location: vin-database.php?status=success");
-            exit;
-
-        } catch (PDOException $e) {
-            $errors[] = "حدث خطأ أثناء معالجة طلبك: " . $e->getMessage();
+            } catch (PDOException $e) {
+                // تسجيل الخطأ في ملف سجل بدلاً من عرضه للمستخدم
+                error_log("Database error: " . $e->getMessage());
+                $errors[] = "حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى لاحقاً.";
+            }
         }
     }
 }
@@ -438,14 +495,15 @@ $page_css = <<<CSS
 }
 CSS;
 
-// JavaScript المخصص للصفحة
+// JavaScript المخصص للصفحة مع تحسينات أمنية
 $page_js = <<<JS
-// التحقق من صحة رقم الشاصي (VIN)
+// التحقق من صحة رقم الشاصي (VIN) وتنظيف المدخلات
 document.addEventListener('DOMContentLoaded', function() {
     const requestTypeSelect = document.getElementById('request_type');
     const customServiceField = document.getElementById('custom_service_field');
     const vinInput = document.getElementById('vin');
     const vinValidation = document.getElementById('vin_validation');
+    const form = document.getElementById('service_request_form');
     
     // مراقبة تغيير نوع الطلب
     if(requestTypeSelect) {
@@ -460,22 +518,58 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // مراقبة إدخال رقم الشاصي للتحقق
+    // تنظيف وتحقق من مدخلات رقم الشاصي
     if(vinInput) {
         vinInput.addEventListener('input', function() {
+            // تحويل الأحرف إلى أحرف كبيرة وإزالة المسافات
+            this.value = this.value.toUpperCase().replace(/\s/g, '');
+            
+            // استبدال الأحرف غير المسموح بها في VIN (I, O, Q)
+            this.value = this.value.replace(/[IOQ]/g, '');
+            
             const vin = this.value.trim();
             
             if(vin.length === 0) {
                 vinValidation.textContent = '';
                 vinValidation.className = 'vin-validation';
             } else if(vin.length === 17) {
-                vinValidation.textContent = '✓ رقم الشاصي صحيح (17 خانة)';
-                vinValidation.className = 'vin-validation vin-valid';
+                // التحقق من صحة تنسيق VIN
+                const vinRegex = /^[A-HJ-NPR-Z0-9]{17}$/;
+                if(vinRegex.test(vin)) {
+                    vinValidation.textContent = '✓ رقم الشاصي صحيح (17 خانة)';
+                    vinValidation.className = 'vin-validation vin-valid';
+                } else {
+                    vinValidation.textContent = '✗ رقم الشاصي يحتوي على أحرف غير صالحة';
+                    vinValidation.className = 'vin-validation vin-invalid';
+                }
             } else {
                 vinValidation.textContent = '✗ رقم الشاصي يجب أن يتكون من 17 خانة بالضبط (الآن: ' + vin.length + ' خانة)';
                 vinValidation.className = 'vin-validation vin-invalid';
             }
         });
+    }
+    
+    // منع إرسال النموذج مرتين
+    if(form) {
+        form.addEventListener('submit', function() {
+            // تعطيل زر الإرسال بعد النقر
+            const submitBtn = document.querySelector('.submit-btn');
+            if(submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري المعالجة...';
+            }
+        });
+    }
+    
+    // إخفاء رسائل النجاح تلقائياً بعد 5 ثوانٍ
+    const successAlert = document.querySelector('.alert-success');
+    if(successAlert) {
+        setTimeout(() => {
+            successAlert.style.opacity = '0';
+            setTimeout(() => {
+                successAlert.style.display = 'none';
+            }, 500);
+        }, 5000);
     }
 });
 JS;
@@ -491,18 +585,18 @@ ob_start();
 </div>
 
 <div class="container">
-    <?php if (isset($_GET['status']) && $_GET['status'] === 'success'): ?>
+    <?php if (!empty($success_message)): ?>
         <div class="alert alert-success">
-            <i class="fas fa-check-circle"></i> تم استلام طلبك بنجاح. سيتواصل معك فريق FlexAuto خلال وقت قصير لتزويدك بالتفاصيل.
+            <i class="fas fa-check-circle"></i> <?= htmlspecialchars($success_message, ENT_QUOTES, 'UTF-8') ?>
         </div>
     <?php endif; ?>
     
-    <?php if (isset($errors) && !empty($errors)): ?>
+    <?php if (!empty($errors)): ?>
         <div class="alert alert-danger">
             <i class="fas fa-exclamation-circle"></i> يرجى تصحيح الأخطاء التالية:
             <ul>
                 <?php foreach ($errors as $error): ?>
-                    <li><?= $error ?></li>
+                    <li><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></li>
                 <?php endforeach; ?>
             </ul>
         </div>
@@ -512,11 +606,14 @@ ob_start();
         <div class="form-content">
             <div class="form-card">
                 <h2 class="form-title"><i class="fas fa-file-alt"></i> نموذج طلب الخدمة</h2>
-                <form method="post" action="">
+                <form method="post" action="" id="service_request_form">
+                    <!-- إضافة توكن CSRF للحماية -->
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
+                    
                     <div class="form-group">
                         <label for="request_type" class="form-label">نوع الطلب:</label>
                         <select id="request_type" name="request_type" class="form-select" required>
-                            <option value="" disabled selected>-- اختر نوع الطلب --</option>
+                            <option value="" disabled <?= empty($request_type) ? 'selected' : '' ?>>-- اختر نوع الطلب --</option>
                             <option value="key_code" <?= isset($request_type) && $request_type === 'key_code' ? 'selected' : '' ?>>طلب كود برمجة مفتاح</option>
                             <option value="custom" <?= isset($request_type) && $request_type === 'custom' ? 'selected' : '' ?>>طلب خدمة أخرى</option>
                         </select>
@@ -524,23 +621,23 @@ ob_start();
                     
                     <div id="custom_service_field" class="form-group custom-service-field" <?= isset($request_type) && $request_type === 'custom' ? 'style="display:block;"' : '' ?>>
                         <label for="custom_service" class="form-label">وصف الخدمة المطلوبة:</label>
-                        <input type="text" id="custom_service" name="custom_service" class="form-control" value="<?= $custom_service ?? '' ?>" placeholder="مثال: فحص إلكتروني متقدم، تعديل برمجيات...">
+                        <input type="text" id="custom_service" name="custom_service" class="form-control" value="<?= htmlspecialchars($custom_service ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="مثال: فحص إلكتروني متقدم، تعديل برمجيات...">
                     </div>
                     
                     <div class="form-group">
                         <label for="car_type" class="form-label">نوع السيارة:</label>
-                        <input type="text" id="car_type" name="car_type" class="form-control" value="<?= $car_type ?? '' ?>" placeholder="مثال: Hyundai Elantra 2021" required>
+                        <input type="text" id="car_type" name="car_type" class="form-control" value="<?= htmlspecialchars($car_type ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="مثال: Hyundai Elantra 2021" required>
                     </div>
                     
                     <div class="form-group">
                         <label for="vin" class="form-label">رقم الشاصي (VIN):</label>
-                        <input type="text" id="vin" name="vin" class="form-control" value="<?= $vin ?? '' ?>" placeholder="KMHCT41DBFU685448" maxlength="17" required>
+                        <input type="text" id="vin" name="vin" class="form-control" value="<?= htmlspecialchars($vin ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="KMHCT41DBFU685448" maxlength="17" required>
                         <div id="vin_validation" class="vin-validation"></div>
                     </div>
                     
                     <div class="form-group">
                         <label for="contact" class="form-label">معلومات التواصل:</label>
-                        <input type="text" id="contact" name="contact" class="form-control" value="<?= $contact ?? '' ?>" placeholder="رقم الهاتف أو البريد الإلكتروني" required>
+                        <input type="text" id="contact" name="contact" class="form-control" value="<?= htmlspecialchars($contact ?? '', ENT_QUOTES, 'UTF-8') ?>" placeholder="رقم الهاتف أو البريد الإلكتروني" required>
                     </div>
                     
                     <button type="submit" class="submit-btn">
