@@ -19,9 +19,21 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 $id = (int)$_GET['id'];
 
 try {
-    // استرجاع بيانات الإصدار
-    $stmt = $pdo->prepare("SELECT * FROM versions WHERE id = ?");
-    $stmt->execute([$id]);
+    // استرجاع بيانات الإصدار - استعلام متوافق مع PostgreSQL
+    $stmt = $pdo->prepare("SELECT 
+        id, 
+        version_number,
+        release_date::text as release_date,
+        version_type,
+        status,
+        summary,
+        details,
+        affected_files,
+        git_commands,
+        created_at::text as created_at,
+        updated_at::text as updated_at
+    FROM versions WHERE id = :id");
+    $stmt->execute(['id' => $id]);
     $version = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if (!$version) {
@@ -35,7 +47,6 @@ try {
     echo json_encode($version);
 } catch (PDOException $e) {
     header('Content-Type: application/json');
-    echo json_encode(['error' => 'حدث خطأ أثناء استرجاع البيانات']);
+    echo json_encode(['error' => 'حدث خطأ أثناء استرجاع البيانات: ' . $e->getMessage()]);
     exit;
 }
-?>

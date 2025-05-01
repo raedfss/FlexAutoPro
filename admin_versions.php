@@ -16,35 +16,37 @@ $hide_title = false;
 $success_message = '';
 $error_message = '';
 
-// ملف إدارة الإصدارات - يفترض وجود جدول versions في قاعدة البيانات
-// في حالة عدم وجوده، يجب إنشاءه
-
-// التحقق من وجود جدول الإصدارات
+// التحقق من وجود جدول الإصدارات - هذه الطريقة متوافقة مع PostgreSQL
 try {
-    $checkTable = $pdo->query("SHOW TABLES LIKE 'versions'");
-    if ($checkTable->rowCount() == 0) {
-        // إنشاء جدول الإصدارات إذا لم يكن موجودًا
+    // استعلام متوافق مع PostgreSQL للتحقق من وجود الجدول
+    $checkTable = $pdo->query("SELECT to_regclass('public.versions') IS NOT NULL AS exists");
+    $tableExists = $checkTable->fetch(PDO::FETCH_ASSOC)['exists'] === 't';
+    
+    if (!$tableExists) {
+        // إنشاء جدول الإصدارات إذا لم يكن موجودًا - متوافق مع PostgreSQL
         $pdo->exec("CREATE TABLE versions (
-            id INT AUTO_INCREMENT PRIMARY KEY,
+            id SERIAL PRIMARY KEY,
             version_number VARCHAR(20) NOT NULL,
             release_date DATE NOT NULL,
-            version_type ENUM('major', 'minor', 'patch') NOT NULL,
-            status ENUM('stable', 'latest', 'beta', 'alpha') NOT NULL,
+            version_type VARCHAR(20) NOT NULL DEFAULT 'major',
+            status VARCHAR(20) NOT NULL DEFAULT 'stable',
             summary TEXT NOT NULL,
             details TEXT NOT NULL,
             affected_files TEXT,
             git_commands TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
         
         // إضافة بعض البيانات الافتراضية
         $stmt = $pdo->prepare("INSERT INTO versions 
             (version_number, release_date, version_type, status, summary, details) 
             VALUES 
-            ('v1.1.0', NOW(), 'major', 'stable', 'نسخة مستقرة جديدة مع تحسينات شاملة', 'تنظيم الكود وتحسين نماذج التذاكر، صفحة ECU الجديدة، التحقق من إدخال البيانات'),
-            ('v1.0.2', DATE_SUB(NOW(), INTERVAL 7 DAY), 'minor', 'latest', 'تحديث صفحة key-code.php بالكامل', 'إعادة تنظيم الكود، تحسين التصميم والرسائل الظاهرة')");
+            ('v1.1.0', CURRENT_DATE, 'major', 'stable', 'نسخة مستقرة جديدة مع تحسينات شاملة', 'تنظيم الكود وتحسين نماذج التذاكر، صفحة ECU الجديدة، التحقق من إدخال البيانات'),
+            ('v1.0.2', CURRENT_DATE - INTERVAL '7 days', 'minor', 'latest', 'تحديث صفحة key-code.php بالكامل', 'إعادة تنظيم الكود، تحسين التصميم والرسائل الظاهرة')");
         $stmt->execute();
+        
+        $success_message = "تم إنشاء جدول الإصدارات بنجاح وإضافة بيانات افتراضية.";
     }
 } catch (PDOException $e) {
     $error_message = "حدث خطأ أثناء إعداد قاعدة البيانات: " . $e->getMessage();
@@ -86,7 +88,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     summary = :summary,
                     details = :details,
                     affected_files = :affected_files,
-                    git_commands = :git_commands
+                    git_commands = :git_commands,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = :id");
                 
                 $stmt->execute([
@@ -124,6 +127,27 @@ try {
 } catch (PDOException $e) {
     $error_message = "حدث خطأ أثناء استرجاع البيانات: " . $e->getMessage();
     $versions = [];
+}
+
+// دالة لعرض أسماء أنواع الإصدارات بالعربية
+function getVersionTypeName($type) {
+    $types = [
+        'major' => 'رئيسي',
+        'minor' => 'ثانوي',
+        'patch' => 'ترقيع'
+    ];
+    return $types[$type] ?? $type;
+}
+
+// دالة لعرض أسماء حالات الإصدارات بالعربية
+function getStatusName($status) {
+    $statuses = [
+        'stable' => 'مستقر',
+        'latest' => 'أحدث',
+        'beta' => 'تجريبي',
+        'alpha' => 'مبدئي'
+    ];
+    return $statuses[$status] ?? $status;
 }
 
 // تحديد CSS الخاص بالصفحة
@@ -441,7 +465,7 @@ ob_start();
                 </tr>
             <?php else: ?>
                 <?php foreach ($versions as $version): ?>
-                    <tr>
+                    <tr data-id="<?= $version['id'] ?>">
                         <td><?= htmlspecialchars($version['version_number']) ?></td>
                         <td><?= date('Y-m-d', strtotime($version['release_date'])) ?></td>
                         <td><span class="status type-<?= $version['version_type'] ?>"><?= getVersionTypeName($version['version_type']) ?></span></td>
@@ -569,59 +593,55 @@ ob_start();
     
     // عرض نموذج تعديل إصدار
     function editVersion(id) {
-        // استرجاع بيانات الإصدار من الخادم
+        // بيانات الصف في الجدول
+        const row = document.querySelector(`tr[data-id="${id}"]`);
+        if (!row) {
+            alert('حدث خطأ أثناء استرجاع بيانات الإصدار');
+            return;
+        }
+        
+        // تعبئة النموذج من البيانات الموجودة في الصف
+        document.getElementById('versionId').value = id;
+        document.getElementById('version_number').value = row.querySelector('td:nth-child(1)').textContent.trim();
+        document.getElementById('release_date').value = row.querySelector('td:nth-child(2)').textContent.trim();
+        
+        // استخلاص نوع الإصدار من الكلاس
+        const typeSpan = row.querySelector('td:nth-child(3) .status');
+        const typeClass = typeSpan.className.match(/type-(\w+)/)[1];
+        document.getElementById('version_type').value = typeClass;
+        
+        // استخلاص حالة الإصدار من الكلاس
+        const statusSpan = row.querySelector('td:nth-child(4) .status');
+        const statusClass = statusSpan.className.match(/status-(\w+)/)[1];
+        document.getElementById('status').value = statusClass;
+        
+        // محاولة الحصول على البيانات الإضافية عبر AJAX
         fetch(`get_version.php?id=${id}`)
             .then(response => response.json())
             .then(data => {
-                // تعبئة النموذج بالبيانات
-                document.getElementById('versionId').value = data.id;
-                document.getElementById('version_number').value = data.version_number;
-                document.getElementById('release_date').value = data.release_date.split(' ')[0]; // استخراج التاريخ فقط
-                document.getElementById('version_type').value = data.version_type;
-                document.getElementById('status').value = data.status;
-                document.getElementById('summary').value = data.summary;
-                document.getElementById('details').value = data.details;
-                document.getElementById('affected_files').value = data.affected_files;
-                document.getElementById('git_commands').value = data.git_commands;
-                
-                // تحديث عنوان النموذج وإجراء النموذج
-                document.getElementById('formTitle').textContent = 'تعديل الإصدار';
-                document.getElementById('formAction').value = 'edit';
-                
-                // عرض النموذج
-                document.getElementById('versionFormOverlay').style.display = 'flex';
+                if (data.error) {
+                    console.error('Error:', data.error);
+                    // لا نعمل شيء، سنستخدم البيانات المتاحة بالفعل
+                } else {
+                    // تعبئة البيانات الإضافية
+                    document.getElementById('summary').value = data.summary || '';
+                    document.getElementById('details').value = data.details || '';
+                    document.getElementById('affected_files').value = data.affected_files || '';
+                    document.getElementById('git_commands').value = data.git_commands || '';
+                }
             })
             .catch(error => {
-                console.error('Error fetching version data:', error);
-                // بدلاً من الاتصال بالخادم، يمكننا استرجاع البيانات من الصفحة مباشرة
-                // هذا الكود سيعمل كحل بديل مؤقت
-                const row = document.querySelector(`tr[data-id="${id}"]`);
-                if (row) {
-                    // تعبئة النموذج من البيانات الموجودة في الصف
-                    document.getElementById('versionId').value = id;
-                    document.getElementById('version_number').value = row.querySelector('td:nth-child(1)').textContent;
-                    document.getElementById('release_date').value = row.querySelector('td:nth-child(2)').textContent;
-                    
-                    // استخلاص نوع الإصدار من الكلاس
-                    const typeSpan = row.querySelector('td:nth-child(3) .status');
-                    const typeClass = typeSpan.className.match(/type-(\w+)/)[1];
-                    document.getElementById('version_type').value = typeClass;
-                    
-                    // استخلاص حالة الإصدار من الكلاس
-                    const statusSpan = row.querySelector('td:nth-child(4) .status');
-                    const statusClass = statusSpan.className.match(/status-(\w+)/)[1];
-                    document.getElementById('status').value = statusClass;
-                    
-                    // عنوان النموذج وإجراء النموذج
-                    document.getElementById('formTitle').textContent = 'تعديل الإصدار';
-                    document.getElementById('formAction').value = 'edit';
-                    
-                    // عرض النموذج
-                    document.getElementById('versionFormOverlay').style.display = 'flex';
-                } else {
-                    alert('حدث خطأ أثناء استرجاع بيانات الإصدار');
-                }
+                console.error('Error fetching version details:', error);
+                // في حالة فشل الحصول على البيانات، نستخدم البيانات المتاحة
+                document.getElementById('summary').value = row.querySelector('td:nth-child(5)').textContent.trim();
             });
+        
+        // عنوان النموذج وإجراء النموذج
+        document.getElementById('formTitle').textContent = 'تعديل الإصدار';
+        document.getElementById('formAction').value = 'edit';
+        
+        // عرض النموذج
+        document.getElementById('versionFormOverlay').style.display = 'flex';
     }
     
     // حذف إصدار
@@ -638,3 +658,9 @@ ob_start();
             hideVersionForm();
         }
     });
+</script>
+
+<?php
+$page_content = ob_get_clean();
+require_once __DIR__ . '/includes/layout.php';
+?>
