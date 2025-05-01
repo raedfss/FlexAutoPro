@@ -97,6 +97,11 @@ $page_css = '
         color: #9452ff;
     }
     
+    .version-tag.security {
+        background-color: rgba(255, 0, 0, 0.15);
+        color: #ff5555;
+    }
+    
     .version-summary {
         margin-top: 10px;
         font-size: 16px;
@@ -251,6 +256,33 @@ $page_css = '
         color: #00d9ff;
     }
     
+    .security-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+        direction: rtl;
+    }
+    
+    .security-table th, .security-table td {
+        padding: 8px 12px;
+        text-align: right;
+        border: 1px solid #2d3748;
+    }
+    
+    .security-table th {
+        background-color: rgba(0, 217, 255, 0.1);
+        color: #00d9ff;
+        font-weight: bold;
+    }
+    
+    .security-table td {
+        color: #e2e8f0;
+    }
+    
+    .security-table tr:nth-child(even) {
+        background-color: rgba(255, 255, 255, 0.03);
+    }
+    
     @media (max-width: 768px) {
         .version-badge {
             position: static;
@@ -274,11 +306,163 @@ ob_start();
     </div>
     
     <ul class="version-list">
+        <!-- إضافة الإصدار الجديد 1.1.2 -->
+        <li class="version-item">
+            <div class="version-badge patch">1.1</div>
+            <span class="version-title">v1.1.2</span>
+            <span class="version-date">1 May 2025</span>
+            <span class="version-tag latest">أحدث إصدار</span>
+            <span class="version-tag security">تحديث أمني</span>
+
+            <div class="version-summary">
+                تحديث شامل للأمان وسد الثغرات المحتملة في جميع نماذج النظام، وتحسين تجربة المستخدم للعملاء والإدارة.
+            </div>
+
+            <div class="version-details">
+                <ul>
+                    <li>إنشاء صفحات التسجيل وتسجيل الدخول الأساسية.</li>
+                    <li>تكوين الجداول الأساسية (Users, Tickets) في قاعدة البيانات.</li>
+                    <li>تطوير الوظائف الأساسية للتعامل مع بيانات المستخدم.</li>
+                </ul>
+            </div>
+        </li>
+        
+        <li class="version-item">
+            <div class="version-badge minor">0.1</div>
+            <span class="version-title">v0.1.0</span>
+            <span class="version-date">15 فبراير 2025</span>
+            <span class="version-tag alpha">بدء المشروع</span>
+            
+            <div class="version-summary">
+                مرحلة بدء المشروع وتهيئة بيئة التطوير.
+            </div>
+            
+            <div class="version-details">
+                <ul>
+                    <li>تهيئة بيئة التطوير باستخدام XAMPP.</li>
+                    <li>إنشاء الهيكلية الأولية للملفات والمجلدات.</li>
+                    <li>وضع خطة العمل وتحديد المتطلبات الأساسية للمشروع.</li>
+                </ul>
+            </div>
+        </li>
+    </ul>
+    
+    <div class="back-link">
+        <a href="home.php">العودة للصفحة الرئيسية</a>
+    </div>
+</div>
+
+<script>
+    // دالة نسخ أوامر Git إلى الحافظة
+    function copyToClipboard(button) {
+        const gitCommandElement = button.nextElementSibling;
+        const textArea = document.createElement('textarea');
+        textArea.value = gitCommandElement.textContent;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        button.textContent = 'تم النسخ!';
+        setTimeout(() => {
+            button.textContent = 'نسخ';
+        }, 2000);
+    }
+    
+    // دالة إخفاء رسائل النجاح والفشل بعد فترة
+    document.addEventListener('DOMContentLoaded', function() {
+        // إخفاء رسائل النجاح والفشل بعد 5 ثوانٍ
+        setTimeout(function() {
+            const messages = document.querySelectorAll('.alert-success, .alert-danger, .alert-warning, .alert-info');
+            messages.forEach(function(message) {
+                message.style.transition = 'opacity 0.5s ease';
+                message.style.opacity = '0';
+                setTimeout(function() {
+                    message.style.display = 'none';
+                }, 500);
+            });
+        }, 5000);
+    });
+</script>
+<?php
+$page_content = ob_get_clean();
+require_once __DIR__ . '/includes/layout.php';
+?>تعزيز حماية النظام ضد هجمات CSRF و XSS و SQL Injection لجميع نماذج الإدخال.</li>
+                    <li>تحسين التحقق من صحة البيانات باستخدام Sanitization و Validation للمدخلات.</li>
+                    <li>تطبيق حماية ملفات إضافية لمنع تنفيذ أو رفع ملفات ضارة محتملة.</li>
+                    <li>إضافة إشعارات نجاح وفشل ديناميكية داخل النماذج تختفي تلقائيًا بعد 5 ثوانٍ.</li>
+                    <li>تطبيق <code>htmlspecialchars()</code> لحماية جميع البيانات المعروضة.</li>
+                    <li>استخدام <code>password_hash()</code> و <code>password_verify()</code> لتشفير كلمات المرور بشكل آمن.</li>
+                    <li>حذف الملفات المؤقتة مثل <code>reset_users.php</code> و <code>change_admin_password.php</code> بعد الاستخدام.</li>
+                    <li>حذف الملف <code>setup_database.php</code> واستبداله بـ <code>setup_database_fixed.php</code> ثم حذفه.</li>
+                </ul>
+                
+                <table class="security-table">
+                    <tr>
+                        <th>الملف</th>
+                        <th>نوع الحماية المضافة</th>
+                    </tr>
+                    <tr>
+                        <td>ticket_submit.php</td>
+                        <td>حماية CSRF + Sanitization + تأكيد صلاحية البيانات</td>
+                    </tr>
+                    <tr>
+                        <td>edit_ticket.php</td>
+                        <td>حماية الجلسة + تأكيد ملكية التذكرة + XSS Filter</td>
+                    </tr>
+                    <tr>
+                        <td>ecu-tuning.php</td>
+                        <td>حماية الملفات + XSS + CSRF</td>
+                    </tr>
+                    <tr>
+                        <td>airbag_reset.php</td>
+                        <td>حماية رفع الملفات + منع تنفيذ الملفات الضارة</td>
+                    </tr>
+                    <tr>
+                        <td>admin_tickets.php</td>
+                        <td>حماية من CSRF عند استخدام mark_seen و cancel_ticket</td>
+                    </tr>
+                    <tr>
+                        <td>login.php / register.php</td>
+                        <td>Sanitization + حماية SQL Injection + فلترة البريد</td>
+                    </tr>
+                    <tr>
+                        <td>vin-database.php</td>
+                        <td>حماية كاملة من XSS + CSRF + Regex مخصص لـ VIN</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="version-files">
+                <span class="file-tag">تحديث <code>ticket_submit.php</code></span>
+                <span class="file-tag">تحديث <code>edit_ticket.php</code></span>
+                <span class="file-tag">تحديث <code>ecu-tuning.php</code></span>
+                <span class="file-tag">تحديث <code>airbag_reset.php</code></span>
+                <span class="file-tag">تحديث <code>admin_tickets.php</code></span>
+                <span class="file-tag">تحديث <code>login.php</code></span>
+                <span class="file-tag">تحديث <code>register.php</code></span>
+                <span class="file-tag">تحديث <code>vin-database.php</code></span>
+                <span class="file-tag">حذف <code>setup_database.php</code></span>
+                <span class="file-tag">حذف <code>reset_users.php</code></span>
+                <span class="file-tag">حذف <code>change_admin_password.php</code></span>
+            </div>
+
+            <div class="git-command">
+                <span class="code-label">أوامر Git</span>
+                <button class="copy-btn" onclick="copyToClipboard(this)">نسخ</button>
+                <code>cd D:\Projects\FlexAutoPro
+git add .
+git commit -m "🔒 v1.1.2: تعزيز أمان النظام، سد الثغرات، وتحسين تجربة المستخدم"
+git tag -a v1.1.2 -m "تحديث أمني شامل v1.1.2"
+git push origin main
+git push origin v1.1.2</code>
+            </div>
+        </li>
+        
         <li class="version-item">
             <div class="version-badge patch">1.1</div>
             <span class="version-title">v1.1.1</span>
             <span class="version-date">1 May 2025</span>
-            <span class="version-tag latest">أحدث إصدار</span>
 
             <div class="version-summary">
                 تحسينات في صفحة <code>admin_versions.php</code> وظهور صفحة سجل الإصدارات من قاعدة البيانات تلقائيًا.
@@ -349,11 +533,11 @@ git push origin v1.1.0</code>
             </div>
         </li>
         
+        <!-- باقي الإصدارات السابقة -->
         <li class="version-item">
             <div class="version-badge minor">1.0</div>
             <span class="version-title">v1.0.2</span>
             <span class="version-date">25 أبريل 2025</span>
-            <span class="version-tag latest">أحدث إصدار</span>
             
             <div class="version-summary">
                 تحديث شامل لصفحة <code>key-code.php</code> مع تحسينات كبيرة في واجهة المستخدم والتحقق من البيانات.
@@ -498,56 +682,4 @@ git push origin v1.1.0</code>
             
             <div class="version-details">
                 <ul>
-                    <li>إنشاء صفحات التسجيل وتسجيل الدخول الأساسية.</li>
-                    <li>تكوين الجداول الأساسية (Users, Tickets) في قاعدة البيانات.</li>
-                    <li>تطوير الوظائف الأساسية للتعامل مع بيانات المستخدم.</li>
-                </ul>
-            </div>
-        </li>
-        
-        <li class="version-item">
-            <div class="version-badge minor">0.1</div>
-            <span class="version-title">v0.1.0</span>
-            <span class="version-date">15 فبراير 2025</span>
-            <span class="version-tag alpha">بدء المشروع</span>
-            
-            <div class="version-summary">
-                مرحلة بدء المشروع وتهيئة بيئة التطوير.
-            </div>
-            
-            <div class="version-details">
-                <ul>
-                    <li>تهيئة بيئة التطوير باستخدام XAMPP.</li>
-                    <li>إنشاء الهيكلية الأولية للملفات والمجلدات.</li>
-                    <li>وضع خطة العمل وتحديد المتطلبات الأساسية للمشروع.</li>
-                </ul>
-            </div>
-        </li>
-    </ul>
-    
-    <div class="back-link">
-        <a href="home.php">العودة للصفحة الرئيسية</a>
-    </div>
-</div>
-
-<script>
-    // دالة نسخ أوامر Git إلى الحافظة
-    function copyToClipboard(button) {
-        const gitCommandElement = button.nextElementSibling;
-        const textArea = document.createElement('textarea');
-        textArea.value = gitCommandElement.textContent;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        button.textContent = 'تم النسخ!';
-        setTimeout(() => {
-            button.textContent = 'نسخ';
-        }, 2000);
-    }
-</script>
-<?php
-$page_content = ob_get_clean();
-require_once __DIR__ . '/includes/layout.php';
-?>
+                    <li>
