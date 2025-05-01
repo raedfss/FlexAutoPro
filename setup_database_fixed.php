@@ -71,13 +71,30 @@ if (!isset($_POST['confirm']) && php_sapi_name() !== 'cli') {
     exit;
 }
 
+// دالة لطباعة رسائل الحالة
+function status($message) {
+    echo $message . "\n";
+    flush();
+}
+
+// دالة لتنفيذ الاستعلامات بشكل آمن
+function executeQuery($pdo, $query, $message = '') {
+    try {
+        $pdo->exec($query);
+        if (!empty($message)) {
+            status($message);
+        }
+        return true;
+    } catch (PDOException $e) {
+        status("خطأ في الاستعلام: " . $e->getMessage());
+        return false;
+    }
+}
+
 try {
-    // بدء المعاملة
-    $pdo->beginTransaction();
+    status("بدء إنشاء هيكل قاعدة البيانات...");
     
-    echo "بدء إنشاء هيكل قاعدة البيانات...\n";
-    
-    // 1. حذف الجداول إذا كانت موجودة
+    // 1. حذف الجداول إذا كانت موجودة - كل جدول في معاملة منفصلة
     $tables = [
         'airbag_resets',
         'activity_logs',
@@ -86,12 +103,11 @@ try {
     ];
     
     foreach ($tables as $table) {
-        $pdo->exec("DROP TABLE IF EXISTS {$table} CASCADE");
-        echo "تم حذف جدول {$table} (إذا كان موجودًا).\n";
+        executeQuery($pdo, "DROP TABLE IF EXISTS {$table} CASCADE", "تم حذف جدول {$table} (إذا كان موجودًا).");
     }
     
     // 2. إنشاء جدول المستخدمين
-    $pdo->exec("
+    $usersTable = "
         CREATE TABLE users (
             id SERIAL PRIMARY KEY,
             username VARCHAR(100) NOT NULL,
@@ -107,11 +123,14 @@ try {
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
-    ");
-    echo "تم إنشاء جدول users.\n";
+    ";
+    
+    if (!executeQuery($pdo, $usersTable, "تم إنشاء جدول users.")) {
+        die("فشل في إنشاء جدول users.");
+    }
     
     // 3. إنشاء جدول سجلات تسجيل الدخول
-    $pdo->exec("
+    $loginLogsTable = "
         CREATE TABLE login_logs (
             id SERIAL PRIMARY KEY,
             user_id INTEGER REFERENCES users(id),
@@ -120,11 +139,14 @@ try {
             user_agent TEXT,
             status VARCHAR(20) NOT NULL DEFAULT 'success'
         )
-    ");
-    echo "تم إنشاء جدول login_logs.\n";
+    ";
+    
+    if (!executeQuery($pdo, $loginLogsTable, "تم إنشاء جدول login_logs.")) {
+        die("فشل في إنشاء جدول login_logs.");
+    }
     
     // 4. إنشاء جدول سجلات النشاط
-    $pdo->exec("
+    $activityLogsTable = "
         CREATE TABLE activity_logs (
             id SERIAL PRIMARY KEY,
             user_id INTEGER REFERENCES users(id),
@@ -133,11 +155,14 @@ try {
             ip_address VARCHAR(45),
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
-    ");
-    echo "تم إنشاء جدول activity_logs.\n";
+    ";
+    
+    if (!executeQuery($pdo, $activityLogsTable, "تم إنشاء جدول activity_logs.")) {
+        die("فشل في إنشاء جدول activity_logs.");
+    }
     
     // 5. إنشاء جدول طلبات Airbag
-    $pdo->exec("
+    $airbagResetsTable = "
         CREATE TABLE airbag_resets (
             id SERIAL PRIMARY KEY,
             user_id INTEGER REFERENCES users(id),
@@ -149,10 +174,13 @@ try {
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
-    ");
-    echo "تم إنشاء جدول airbag_resets.\n";
+    ";
     
-    // 6. إضافة المستخدمين
+    if (!executeQuery($pdo, $airbagResetsTable, "تم إنشاء جدول airbag_resets.")) {
+        die("فشل في إنشاء جدول airbag_resets.");
+    }
+    
+    // 6. إضافة المستخدمين - كل مستخدم في معاملة منفصلة
     $users = [
         // المسؤول
         [
@@ -188,80 +216,106 @@ try {
         ]
     ];
     
-    $stmt = $pdo->prepare("
-        INSERT INTO users (email, username, password, fullname, role, created_at, updated_at)
-        VALUES (:email, :username, :password, :fullname, :role, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    ");
-    
     foreach ($users as $user) {
-        $hashed_password = password_hash($user['password'], PASSWORD_DEFAULT);
-        $stmt->execute([
-            'email' => $user['email'],
-            'username' => $user['username'],
-            'password' => $hashed_password,
-            'fullname' => $user['fullname'],
-            'role' => $user['role']
-        ]);
-        echo "تم إنشاء المستخدم: {$user['email']} (كلمة المرور: {$user['password']})\n";
+        try {
+            $pdo->beginTransaction();
+            
+            $stmt = $pdo->prepare("
+                INSERT INTO users (email, username, password, fullname, role, created_at, updated_at)
+                VALUES (:email, :username, :password, :fullname, :role, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ");
+            
+            $hashed_password = password_hash($user['password'], PASSWORD_DEFAULT);
+            $stmt->execute([
+                'email' => $user['email'],
+                'username' => $user['username'],
+                'password' => $hashed_password,
+                'fullname' => $user['fullname'],
+                'role' => $user['role']
+            ]);
+            
+            $pdo->commit();
+            status("تم إنشاء المستخدم: {$user['email']} (كلمة المرور: {$user['password']})");
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            status("خطأ في إنشاء المستخدم {$user['email']}: " . $e->getMessage());
+        }
     }
     
-    // 7. إضافة بعض سجلات النشاط للاختبار
-    $admin_id = $pdo->query("SELECT id FROM users WHERE email = 'raedfss@hotmail.com'")->fetchColumn();
-    $activities = [
-        ['login', 'تسجيل دخول المستخدم'],
-        ['view_dashboard', 'عرض لوحة التحكم'],
-        ['update_profile', 'تحديث الملف الشخصي'],
-        ['system_config', 'تعديل إعدادات النظام']
-    ];
+    // 7. تجربة إضافة بيانات اختبارية (لوجود المشكلة، سنقوم بكل جزء منفصلاً)
+    status("محاولة إضافة بيانات تجريبية...");
     
-    $stmt = $pdo->prepare("
-        INSERT INTO activity_logs (user_id, activity_type, description, ip_address, created_at)
-        VALUES (:user_id, :type, :description, '127.0.0.1', CURRENT_TIMESTAMP)
-    ");
-    
-    foreach ($activities as $activity) {
+    try {
+        // البحث عن معرف المسؤول
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE email = :email");
+        $stmt->execute(['email' => 'raedfss@hotmail.com']);
+        $admin_id = $stmt->fetchColumn();
+        
+        if (!$admin_id) {
+            throw new Exception("لم يتم العثور على معرف المستخدم المسؤول");
+        }
+        
+        status("تم العثور على معرف المستخدم المسؤول: " . $admin_id);
+        
+        // حاول إضافة سجل نشاط تجريبي
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare("
+            INSERT INTO activity_logs (user_id, activity_type, description, ip_address, created_at)
+            VALUES (:user_id, :type, :description, '127.0.0.1', CURRENT_TIMESTAMP)
+        ");
+        
         $stmt->execute([
             'user_id' => $admin_id,
-            'type' => $activity[0],
-            'description' => $activity[1]
+            'type' => 'setup',
+            'description' => 'إنشاء هيكل قاعدة البيانات'
         ]);
+        
+        $pdo->commit();
+        status("تم إضافة سجل نشاط تجريبي.");
+        
+        // حاول إضافة سجل تسجيل دخول
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare("
+            INSERT INTO login_logs (user_id, login_time, ip_address, user_agent)
+            VALUES (:user_id, CURRENT_TIMESTAMP, '127.0.0.1', 'Setup Script')
+        ");
+        
+        $stmt->execute(['user_id' => $admin_id]);
+        $pdo->commit();
+        status("تم إضافة سجل تسجيل دخول تجريبي.");
+        
+        // حاول إضافة طلب Airbag تجريبي
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare("
+            INSERT INTO airbag_resets (user_id, ecu_number, vehicle_type, uploaded_file, status, created_at, updated_at)
+            VALUES (:user_id, 'ECU123456', 'BMW X5 2020', 'sample_file.bin', 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ");
+        
+        $stmt->execute(['user_id' => $admin_id]);
+        $pdo->commit();
+        status("تم إضافة طلب Airbag تجريبي.");
+        
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        status("خطأ في إضافة البيانات التجريبية: " . $e->getMessage());
+        // نتابع التنفيذ حتى لو فشلت إضافة البيانات التجريبية
     }
-    echo "تم إضافة سجلات نشاط تجريبية.\n";
     
-    // 8. إضافة سجل تسجيل دخول
-    $stmt = $pdo->prepare("
-        INSERT INTO login_logs (user_id, login_time, ip_address, user_agent)
-        VALUES (:user_id, CURRENT_TIMESTAMP, '127.0.0.1', 'Setup Script')
-    ");
-    $stmt->execute(['user_id' => $admin_id]);
-    echo "تم إضافة سجل تسجيل دخول تجريبي.\n";
-    
-    // 9. إضافة طلب Airbag تجريبي
-    $stmt = $pdo->prepare("
-        INSERT INTO airbag_resets (user_id, ecu_number, vehicle_type, uploaded_file, status, created_at, updated_at)
-        VALUES (:user_id, 'ECU123456', 'BMW X5 2020', 'sample_file.bin', 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-    ");
-    $stmt->execute(['user_id' => $admin_id]);
-    echo "تم إضافة طلب Airbag تجريبي.\n";
-    
-    // 10. إتمام المعاملة
-    $pdo->commit();
-    
-    echo "\n==============================================\n";
-    echo "تم إنشاء هيكل قاعدة البيانات بنجاح!\n";
-    echo "==============================================\n";
-    echo "تفاصيل حساب المسؤول:\n";
-    echo "البريد الإلكتروني: raedfss@hotmail.com\n";
-    echo "كلمة المرور: Admin@123\n";
-    echo "==============================================\n";
-    echo "\nيرجى حذف هذا الملف الآن للحفاظ على أمان النظام!\n";
+    status("\n==============================================");
+    status("تم إنشاء هيكل قاعدة البيانات بنجاح!");
+    status("==============================================");
+    status("تفاصيل حساب المسؤول:");
+    status("البريد الإلكتروني: raedfss@hotmail.com");
+    status("كلمة المرور: Admin@123");
+    status("==============================================");
+    status("\nيرجى حذف هذا الملف الآن للحفاظ على أمان النظام!");
     
 } catch (Exception $e) {
-    // التراجع عن التغييرات في حالة حدوث خطأ
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-    die("حدث خطأ: " . $e->getMessage());
+    status("حدث خطأ عام: " . $e->getMessage());
 }
 
 // عرض صفحة التأكيد
@@ -270,18 +324,30 @@ if (!isset($_SERVER['HTTP_HOST'])) {
     exit;
 }
 
+// التحقق من نجاح العملية
+$usersExist = false;
+try {
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = :email");
+    $stmt->execute(['email' => 'raedfss@hotmail.com']);
+    $count = $stmt->fetchColumn();
+    $usersExist = ($count > 0);
+} catch (Exception $e) {
+    // تجاهل الأخطاء
+}
+
 echo <<<HTML
 <!DOCTYPE html>
 <html dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تم إنشاء هيكل قاعدة البيانات بنجاح</title>
+    <title>تم إنشاء هيكل قاعدة البيانات</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
         .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         .success { background: #d4edda; color: #155724; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
         .warning { background: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; margin: 20px 0; }
         .info { background: #e3f2fd; color: #0c5460; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+        .error { background: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
         .btn { padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; text-decoration: none; display: inline-block; margin-top: 20px; }
         h1, h2 { color: #343a40; }
         .table { width: 100%; border-collapse: collapse; margin: 15px 0; }
@@ -291,11 +357,18 @@ echo <<<HTML
 </head>
 <body>
     <div class="container">
-        <h1>تم إنشاء هيكل قاعدة البيانات بنجاح!</h1>
+        <h1>تقرير إنشاء هيكل قاعدة البيانات</h1>
         
+        <?php if ($usersExist): ?>
         <div class="success">
-            <strong>تم إنشاء جميع الجداول وإدخال البيانات الأساسية بنجاح.</strong>
+            <strong>تم إنشاء هيكل قاعدة البيانات بنجاح!</strong>
         </div>
+        <?php else: ?>
+        <div class="error">
+            <strong>تم إنشاء الجداول ولكن قد تكون هناك بعض المشاكل في البيانات.</strong>
+            <p>يرجى التحقق من الرسائل أعلاه للحصول على تفاصيل.</p>
+        </div>
+        <?php endif; ?>
         
         <h2>الجداول التي تم إنشاؤها:</h2>
         <ul>
@@ -342,10 +415,6 @@ echo <<<HTML
                 </tr>
             </tbody>
         </table>
-        
-        <div class="info">
-            <p>تم أيضًا إنشاء بعض البيانات التجريبية في جداول سجلات النشاط وتسجيل الدخول وطلبات Airbag.</p>
-        </div>
         
         <div class="warning">
             <strong>تحذير أمني:</strong> يرجى حذف هذا الملف فورًا بعد الاستخدام لتجنب المخاطر الأمنية!
