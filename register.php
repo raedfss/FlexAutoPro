@@ -1,144 +1,102 @@
 <?php
 session_start();
+require_once 'includes/db.php';
 
-// تهيئة متغيرات الرسائل
 $register_error = '';
 $register_success = '';
 
-// إذا كان المستخدم مسجل الدخول بالفعل، يتم إعادة توجيهه
-if (isset($_SESSION['user_id'])) {
-    header("Location: home.php");
-    exit;
-}
-
-// إنشاء توكن CSRF للنموذج
-if (!isset($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-$csrf_token = $_SESSION['csrf_token'];
-
-// استيراد ملف الاتصال بقاعدة البيانات
-require_once 'includes/db.php';
-
-// معالجة نموذج التسجيل
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    // التحقق من توكن CSRF
-    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        $register_error = "❌ خطأ في التحقق من الأمان. الرجاء المحاولة مرة أخرى.";
+    // تنظيف وتحقق من المدخلات
+    $email = filter_var(trim($_POST['email']), FILTER_SANITIZE_EMAIL);
+    $password = trim($_POST['password']);
+    $confirm_password = trim($_POST['confirm_password']);
+    
+    // استبدال FILTER_SANITIZE_STRING بـ htmlspecialchars
+    $fullname = isset($_POST['fullname']) ? htmlspecialchars(trim($_POST['fullname']), ENT_QUOTES, 'UTF-8') : '';
+    $phone = isset($_POST['phone']) ? htmlspecialchars(trim($_POST['phone']), ENT_QUOTES, 'UTF-8') : '';
+    $username = htmlspecialchars(explode('@', $email)[0], ENT_QUOTES, 'UTF-8');
+
+    if ($password !== $confirm_password) {
+        $register_error = "❌ كلمتا المرور غير متطابقتين.";
+    } elseif (strlen($password) < 8) {
+        $register_error = "❌ يجب أن تكون كلمة المرور 8 أحرف على الأقل.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $register_error = "❌ البريد الإلكتروني غير صالح.";
     } else {
-        // تنظيف وتحقق من المدخلات
-        $email = filter_var(trim($_POST['email']), FILTER_SANITIZE_EMAIL);
-        $password = trim($_POST['password']);
-        $confirm_password = trim($_POST['confirm_password']);
-        $fullname = filter_var(trim($_POST['fullname'] ?? ''), FILTER_SANITIZE_STRING);
-        $phone = filter_var(trim($_POST['phone'] ?? ''), FILTER_SANITIZE_STRING);
-        $username = filter_var(explode('@', $email)[0], FILTER_SANITIZE_STRING); // استخلاص اسم المستخدم من الإيميل
+        try {
+            $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = :email");
+            $stmt->execute(['email' => $email]);
+            $exists = $stmt->fetchColumn();
 
-        // سلسلة من التحققات
-        $errors = [];
+            if ($exists) {
+                $register_error = "❌ هذا البريد الإلكتروني مسجل مسبقًا.";
+            } else {
+                // تحديد الدور تلقائيًا بناءً على البريد
+                $role = ($email === 'raedfss@hotmail.com') ? 'admin' : 'user';
+                
+                // تشفير كلمة المرور بدلاً من تخزينها كنص صريح
+                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-        // التحقق من صحة البريد الإلكتروني
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errors[] = "يرجى إدخال بريد إلكتروني صالح";
-        }
-
-        // التحقق من طول كلمة المرور
-        if (strlen($password) < 8) {
-            $errors[] = "يجب أن تكون كلمة المرور 8 أحرف على الأقل";
-        }
-
-        // التحقق من تعقيد كلمة المرور (الحروف الكبيرة والصغيرة والأرقام والرموز)
-        if (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/', $password)) {
-            $errors[] = "يجب أن تحتوي كلمة المرور على حروف كبيرة وصغيرة وأرقام";
-        }
-
-        // التحقق من تطابق كلمتي المرور
-        if ($password !== $confirm_password) {
-            $errors[] = "كلمتا المرور غير متطابقتين";
-        }
-
-        // جمع كل الأخطاء
-        if (!empty($errors)) {
-            $register_error = "❌ " . implode(". ", $errors) . ".";
-        } else {
-            try {
-                // التحقق من وجود البريد الإلكتروني في قاعدة البيانات
-                $stmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE email = :email");
-                $stmt->execute(['email' => $email]);
-                $exists = $stmt->fetchColumn();
-
-                if ($exists) {
-                    $register_error = "❌ هذا البريد الإلكتروني مسجل مسبقًا.";
-                } else {
-                    // تشفير كلمة المرور
-                    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-
-                    // تحديد الدور تلقائيًا بناءً على البريد
-                    $role = ($email === 'raedfss@hotmail.com') ? 'admin' : 'user';
-
-                    // إنشاء كود تفعيل (إذا كنت تريد نظام تفعيل عبر البريد)
-                    $activation_code = bin2hex(random_bytes(16));
-                    $is_active = ($role === 'admin') ? 1 : 0; // تفعيل حساب المسؤول تلقائيًا
-                    
-                    // إضافة رقم الهاتف الاختياري
-                    $phone = !empty($phone) ? $phone : null;
-                    
-                    // إدخال بيانات المستخدم الجديد في قاعدة البيانات
-                    $stmt = $pdo->prepare("
-                        INSERT INTO users (email, password, username, fullname, phone, role, activation_code, is_active, created_at) 
-                        VALUES (:email, :password, :username, :fullname, :phone, :role, :activation_code, :is_active, NOW())
-                    ");
-                    
-                    $stmt->execute([
-                        'email' => $email,
-                        'password' => $hashed_password,
-                        'username' => $username,
-                        'fullname' => $fullname,
-                        'phone' => $phone,
-                        'role' => $role,
-                        'activation_code' => $activation_code,
-                        'is_active' => $is_active
-                    ]);
-                    
-                    // الحصول على معرف المستخدم الجديد
-                    $user_id = $pdo->lastInsertId();
-                    
-                    // تسجيل عملية التسجيل
-                    $logStmt = $pdo->prepare("
-                        INSERT INTO activity_logs (user_id, activity_type, description, ip_address, created_at) 
-                        VALUES (:user_id, 'register', 'تم إنشاء حساب جديد', :ip, NOW())
-                    ");
-                    
-                    $logStmt->execute([
-                        'user_id' => $user_id,
-                        'ip' => $_SERVER['REMOTE_ADDR']
-                    ]);
-                    
-                    // إرسال رسالة نجاح مع تعليمات إضافية
-                    if ($is_active) {
-                        $register_success = "✅ تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن.";
-                    } else {
-                        // هنا يمكنك إضافة كود لإرسال بريد التفعيل
-                        $register_success = "✅ تم إنشاء الحساب بنجاح! يرجى مراجعة بريدك الإلكتروني لتفعيل الحساب.";
-                        
-                        // يمكن إضافة كود لإرسال بريد تفعيل هنا
-                        // sendActivationEmail($email, $activation_code);
-                    }
-                    
-                    // إعادة تعيين قيم النموذج بعد التسجيل الناجح
-                    $email = $fullname = $phone = '';
+                // تحضير استعلام الإدخال بناءً على الأعمدة المتاحة
+                // التحقق من وجود الأعمدة الإضافية
+                $columnsQuery = $pdo->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'");
+                $columns = [];
+                while ($column = $columnsQuery->fetch(PDO::FETCH_ASSOC)) {
+                    $columns[] = strtolower($column['column_name']);
                 }
-            } catch (PDOException $e) {
-                // تسجيل الخطأ بشكل آمن
-                error_log("Database error in register.php: " . $e->getMessage());
-                $register_error = "❌ حدث خطأ أثناء التسجيل. الرجاء المحاولة مرة أخرى لاحقًا.";
+                
+                // بناء استعلام ديناميكي
+                $fields = ['email', 'username', 'password', 'role'];
+                $values = [':email', ':username', ':password', ':role'];
+                $params = [
+                    ':email' => $email,
+                    ':username' => $username,
+                    ':password' => $hashed_password,
+                    ':role' => $role
+                ];
+                
+                // إضافة الحقول الإضافية حسب الحاجة
+                if (in_array('fullname', $columns) && !empty($fullname)) {
+                    $fields[] = 'fullname';
+                    $values[] = ':fullname';
+                    $params[':fullname'] = $fullname;
+                }
+                
+                if (in_array('phone', $columns) && !empty($phone)) {
+                    $fields[] = 'phone';
+                    $values[] = ':phone';
+                    $params[':phone'] = $phone;
+                }
+                
+                if (in_array('is_active', $columns)) {
+                    $fields[] = 'is_active';
+                    $values[] = ':is_active';
+                    $params[':is_active'] = 1; // تفعيل الحساب مباشرة
+                }
+                
+                if (in_array('created_at', $columns)) {
+                    $fields[] = 'created_at';
+                    $values[] = 'NOW()';
+                }
+                
+                // إنشاء استعلام SQL
+                $sql = "INSERT INTO users (" . implode(", ", $fields) . ") VALUES (" . implode(", ", $values) . ")";
+                
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+
+                $register_success = "✅ تم إنشاء الحساب بنجاح! يمكنك تسجيل الدخول الآن.";
+                
+                // إعادة التوجيه إلى صفحة تسجيل الدخول بعد نجاح التسجيل
+                $_SESSION['message'] = $register_success;
+                header("Location: login.php");
+                exit;
             }
+        } catch (PDOException $e) {
+            error_log("خطأ في قاعدة البيانات: " . $e->getMessage());
+            $register_error = "❌ حدث خطأ أثناء التسجيل. الرجاء المحاولة مرة أخرى لاحقًا.";
         }
     }
-    
-    // إنشاء توكن CSRF جديد بعد المحاولة
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    $csrf_token = $_SESSION['csrf_token'];
 }
 ?>
 
@@ -148,7 +106,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>إنشاء حساب | FlexAuto</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             margin: 0;
@@ -197,15 +156,14 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             color: white;
             cursor: pointer;
             margin-top: 20px;
-            font-weight: bold;
         }
         .login-box input[type="submit"]:hover {
             background-color: #63b3ed;
         }
         .password-requirements {
-            margin-top: 5px;
             font-size: 12px;
             color: #ddd;
+            margin-top: 5px;
             padding-right: 10px;
         }
         .extra-links {
@@ -270,38 +228,33 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
 <div class="login-box">
     <h2>تسجيل مستخدم جديد</h2>
-    <form method="post" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" autocomplete="off" id="registerForm">
-        <!-- إضافة توكن CSRF -->
-        <input type="hidden" name="csrf_token" value="<?php echo $csrf_token; ?>">
-        
+    <form method="post" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" id="registerForm">
         <input type="email" name="email" placeholder="البريد الإلكتروني *" required
-               maxlength="100" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+               maxlength="150" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
         
         <input type="text" name="fullname" placeholder="الاسم الكامل *" required
-               maxlength="100" value="<?php echo isset($_POST['fullname']) ? htmlspecialchars($_POST['fullname']) : ''; ?>">
+               maxlength="150" value="<?php echo isset($_POST['fullname']) ? htmlspecialchars($_POST['fullname']) : ''; ?>">
         
         <input type="tel" name="phone" placeholder="رقم الهاتف (اختياري)"
                pattern="[0-9+\-\s]{8,15}" title="يرجى إدخال رقم هاتف صحيح"
-               maxlength="15" value="<?php echo isset($_POST['phone']) ? htmlspecialchars($_POST['phone']) : ''; ?>">
+               maxlength="20" value="<?php echo isset($_POST['phone']) ? htmlspecialchars($_POST['phone']) : ''; ?>">
         <span class="optional-label">رقم الهاتف اختياري</span>
         
         <input type="password" name="password" id="password" placeholder="كلمة المرور *" required
-               minlength="8" maxlength="100">
+               minlength="8" maxlength="255">
         <div class="password-requirements">
-            * يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل، وتشمل حرف كبير وحرف صغير ورقم واحد على الأقل.
+            * يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل.
         </div>
         
         <input type="password" name="confirm_password" placeholder="تأكيد كلمة المرور *" required
-               minlength="8" maxlength="100">
+               minlength="8" maxlength="255">
         
         <input type="submit" value="تسجيل">
     </form>
 
     <?php if (!empty($register_error)): ?>
         <div class="error"><?php echo $register_error; ?></div>
-    <?php endif; ?>
-    
-    <?php if (!empty($register_success)): ?>
+    <?php elseif (!empty($register_success)): ?>
         <div class="success"><?php echo htmlspecialchars($register_success); ?></div>
     <?php endif; ?>
 
@@ -317,28 +270,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <div style="margin-top: 5px;">&copy; <?php echo date('Y'); ?> FlexAuto. جميع الحقوق محفوظة.</div>
 </footer>
 
-<!-- إضافة سكريبت للتحقق من كلمة المرور في جانب العميل -->
+<!-- التحقق من التسجيل في جانب العميل -->
 <script>
-    // التحقق من جودة كلمة المرور
-    document.getElementById("password").addEventListener("input", function() {
-        const password = this.value;
-        const requirements = document.querySelector(".password-requirements");
-        
-        // تحقق من قوة كلمة المرور
-        const hasUpperCase = /[A-Z]/.test(password);
-        const hasLowerCase = /[a-z]/.test(password);
-        const hasNumber = /[0-9]/.test(password);
-        const isLongEnough = password.length >= 8;
-        
-        // تغيير لون متطلبات كلمة المرور
-        if (isLongEnough && hasUpperCase && hasLowerCase && hasNumber) {
-            requirements.style.color = "#a0ffb7"; // أخضر فاتح
-        } else {
-            requirements.style.color = "#ddd"; // اللون الافتراضي
-        }
-    });
-    
-    // التحقق من تطابق كلمتي المرور
+    // التحقق من تطابق كلمات المرور
     document.getElementById("registerForm").addEventListener("submit", function(event) {
         const password = document.querySelector('input[name="password"]').value;
         const confirmPassword = document.querySelector('input[name="confirm_password"]').value;
@@ -347,14 +281,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             event.preventDefault();
             alert("كلمتا المرور غير متطابقتين. يرجى التحقق.");
         }
-    });
-    
-    // تعطيل التخزين المؤقت للصفحة
-    window.onpageshow = function(event) {
-        if (event.persisted) {
-            window.location.reload();
+        
+        if (password.length < 8) {
+            event.preventDefault();
+            alert("يجب أن تكون كلمة المرور 8 أحرف على الأقل.");
         }
-    };
+    });
 </script>
 
 </body>
