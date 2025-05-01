@@ -16,42 +16,6 @@ $hide_title = false;
 $success_message = '';
 $error_message = '';
 
-// التحقق من وجود جدول الإصدارات - هذه الطريقة متوافقة مع PostgreSQL
-try {
-    // استعلام متوافق مع PostgreSQL للتحقق من وجود الجدول
-    $checkTable = $pdo->query("SELECT to_regclass('public.versions') IS NOT NULL AS exists");
-    $tableExists = $checkTable->fetch(PDO::FETCH_ASSOC)['exists'] === 't';
-    
-    if (!$tableExists) {
-        // إنشاء جدول الإصدارات إذا لم يكن موجودًا - متوافق مع PostgreSQL
-        $pdo->exec("CREATE TABLE versions (
-            id SERIAL PRIMARY KEY,
-            version_number VARCHAR(20) NOT NULL,
-            release_date DATE NOT NULL,
-            version_type VARCHAR(20) NOT NULL DEFAULT 'major',
-            status VARCHAR(20) NOT NULL DEFAULT 'stable',
-            summary TEXT NOT NULL,
-            details TEXT NOT NULL,
-            affected_files TEXT,
-            git_commands TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )");
-        
-        // إضافة بعض البيانات الافتراضية
-        $stmt = $pdo->prepare("INSERT INTO versions 
-            (version_number, release_date, version_type, status, summary, details) 
-            VALUES 
-            ('v1.1.0', CURRENT_DATE, 'major', 'stable', 'نسخة مستقرة جديدة مع تحسينات شاملة', 'تنظيم الكود وتحسين نماذج التذاكر، صفحة ECU الجديدة، التحقق من إدخال البيانات'),
-            ('v1.0.2', CURRENT_DATE - INTERVAL '7 days', 'minor', 'latest', 'تحديث صفحة key-code.php بالكامل', 'إعادة تنظيم الكود، تحسين التصميم والرسائل الظاهرة')");
-        $stmt->execute();
-        
-        $success_message = "تم إنشاء جدول الإصدارات بنجاح وإضافة بيانات افتراضية.";
-    }
-} catch (PDOException $e) {
-    $error_message = "حدث خطأ أثناء إعداد قاعدة البيانات: " . $e->getMessage();
-}
-
 // معالجة النموذج
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
@@ -125,8 +89,45 @@ try {
     $stmt = $pdo->query("SELECT * FROM versions ORDER BY release_date DESC, version_number DESC");
     $versions = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
-    $error_message = "حدث خطأ أثناء استرجاع البيانات: " . $e->getMessage();
-    $versions = [];
+    // إذا كان الخطأ بسبب عدم وجود الجدول، قم بإنشائه
+    if (strpos($e->getMessage(), 'relation "versions" does not exist') !== false) {
+        try {
+            // إنشاء جدول الإصدارات
+            $pdo->exec("CREATE TABLE versions (
+                id SERIAL PRIMARY KEY,
+                version_number VARCHAR(20) NOT NULL,
+                release_date DATE NOT NULL,
+                version_type VARCHAR(20) NOT NULL DEFAULT 'major',
+                status VARCHAR(20) NOT NULL DEFAULT 'stable',
+                summary TEXT NOT NULL,
+                details TEXT NOT NULL,
+                affected_files TEXT,
+                git_commands TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )");
+            
+            // إضافة بعض البيانات الافتراضية
+            $stmt = $pdo->prepare("INSERT INTO versions 
+                (version_number, release_date, version_type, status, summary, details) 
+                VALUES 
+                ('v1.1.0', CURRENT_DATE, 'major', 'stable', 'نسخة مستقرة جديدة مع تحسينات شاملة', 'تنظيم الكود وتحسين نماذج التذاكر، صفحة ECU الجديدة، التحقق من إدخال البيانات'),
+                ('v1.0.2', CURRENT_DATE - INTERVAL '7 days', 'minor', 'latest', 'تحديث صفحة key-code.php بالكامل', 'إعادة تنظيم الكود، تحسين التصميم والرسائل الظاهرة')");
+            $stmt->execute();
+            
+            $success_message = "تم إنشاء جدول الإصدارات بنجاح وإضافة بيانات افتراضية.";
+            
+            // محاولة استرداد البيانات مرة أخرى
+            $stmt = $pdo->query("SELECT * FROM versions ORDER BY release_date DESC, version_number DESC");
+            $versions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e2) {
+            $error_message = "حدث خطأ أثناء إنشاء الجدول: " . $e2->getMessage();
+            $versions = [];
+        }
+    } else {
+        $error_message = "حدث خطأ أثناء استرجاع البيانات: " . $e->getMessage();
+        $versions = [];
+    }
 }
 
 // دالة لعرض أسماء أنواع الإصدارات بالعربية
