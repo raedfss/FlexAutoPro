@@ -81,6 +81,18 @@ $page_css = <<<CSS
   transform: translateY(-4px);
   background: linear-gradient(145deg, #2eaaff, #0088ff);
 }
+.admin-links a {
+  background: linear-gradient(145deg, #6f00ff, #4700cc);
+}
+.admin-links a:hover {
+  background: linear-gradient(145deg, #8a1aff, #5800ff);
+}
+.admin-highlight {
+  background: linear-gradient(145deg, #ff7300, #cc4e00) !important;
+}
+.admin-highlight:hover {
+  background: linear-gradient(145deg, #ff8c1a, #ff5e00) !important;
+}
 .notification-badge {
   position: absolute;
   top: -6px;
@@ -112,6 +124,11 @@ $page_css = <<<CSS
   font-weight: bold;
   text-decoration: none;
 }
+.admin-section {
+  margin-top: 25px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 25px;
+}
 CSS;
 
 // تعريف محتوى الصفحة
@@ -121,11 +138,13 @@ ob_start();
   <div class="avatar"><?= strtoupper(substr($username, 0, 1)) ?></div>
   <div class="role">لقد سجلت الدخول بصلاحية: <strong><?= $user_type === 'admin' ? 'مدير النظام 👑' : 'مستخدم 👤' ?></strong></div>
 
-  <div class="links">
+  <div class="links <?= $user_type === 'admin' ? 'admin-links' : '' ?>">
     <?php if ($user_type === 'admin'): ?>
       <a href="dashboard.php">📊 لوحة التحكم</a>
       <a href="manage_users.php">👥 إدارة المستخدمين</a>
       <a href="admin_tickets.php" class="admin-highlight">🎫 إدارة التذاكر</a>
+      <a href="admin_versions.php">🔖 إدارة الإصدارات</a>
+      <a href="inventory_management.php">🏪 إدارة المستودع</a>
       <a href="logs.php">📁 سجلات النظام</a>
     <?php else: ?>
       <a href="key-code.php">🔑 كود المفتاح</a>
