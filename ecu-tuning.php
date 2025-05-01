@@ -73,7 +73,80 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // معالجة الملف إذا تم رفعه
         if (isset($_FILES['ecu_file']) && $_FILES['ecu_file']['error'] === UPLOAD_ERR_OK) {
-            // التحقق من نوع الملف
+            // تشغيل التحقق عند تحميل الصفحة إذا كانت هناك قيمة
+            if (chassisInput.value.length > 0) {
+                chassisInput.dispatchEvent(new Event('input'));
+            }
+        }
+        
+        // منع إرسال النموذج مرتين
+        const form = document.getElementById('ecu-form');
+        const submitBtn = document.getElementById('submit-btn');
+        
+        if (form && submitBtn) {
+            form.addEventListener('submit', function() {
+                // التحقق من صحة رقم الشاصي قبل الإرسال
+                const chassisValue = chassisInput.value.trim();
+                if (chassisValue.length !== 17) {
+                    vinValidation.textContent = '✗ رقم الشاصي يجب أن يتكون من 17 خانة بالضبط';
+                    vinValidation.className = 'vin-validation vin-invalid';
+                    chassisInput.focus();
+                    return false;
+                }
+                
+                // تعطيل زر الإرسال بعد النقر
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإرسال...';
+            });
+        }
+        
+        // إخفاء رسائل التنبيه تلقائياً بعد 8 ثوانٍ
+        const alerts = document.querySelectorAll('.alert');
+        if (alerts.length) {
+            setTimeout(() => {
+                alerts.forEach(alert => {
+                    alert.style.opacity = '0';
+                    alert.style.transition = 'opacity 0.5s';
+                    setTimeout(() => {
+                        alert.style.display = 'none';
+                    }, 500);
+                });
+            }, 8000);
+        }
+        
+        // التحقق من حجم الملف قبل الإرسال
+        const fileInput = document.getElementById('ecu_file');
+        if (fileInput) {
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    const fileSize = this.files[0].size; // بالبايت
+                    const maxSize = 10 * 1024 * 1024; // 10 ميجابايت
+                    
+                    if (fileSize > maxSize) {
+                        alert('حجم الملف كبير جدًا. الحد الأقصى هو 10 ميجابايت.');
+                        this.value = ''; // مسح الملف المحدد
+                    }
+                    
+                    // التحقق من امتداد الملف
+                    const fileName = this.files[0].name;
+                    const fileExt = fileName.split('.').pop().toLowerCase();
+                    const allowedExts = ['bin', 'hex', 'zip', 'rar', 'pdf'];
+                    
+                    if (!allowedExts.includes(fileExt)) {
+                        alert('نوع الملف غير مسموح به. الأنواع المسموحة: ' + allowedExts.join(', '));
+                        this.value = ''; // مسح الملف المحدد
+                    }
+                }
+            });
+        }
+    });
+</script>
+
+<?php
+// تخزين المحتوى وعرضه في قالب layout.php
+$page_content = ob_get_clean();
+include __DIR__ . '/includes/layout.php';
+?> التحقق من نوع الملف
             $allowed_extensions = ['bin', 'hex', 'zip', 'rar', 'pdf'];
             $file_extension = strtolower(pathinfo($_FILES['ecu_file']['name'], PATHINFO_EXTENSION));
             
@@ -84,22 +157,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($_FILES['ecu_file']['size'] > 10 * 1024 * 1024) {
                     $error_messages[] = "حجم الملف كبير جدًا. الحد الأقصى هو 10 ميجابايت";
                 } else {
-                    $target_dir = __DIR__ . "/uploads/ecu_files/";
-                    
-                    // إنشاء المجلد إذا لم يكن موجودًا
-                    if (!is_dir($target_dir)) {
-                        mkdir($target_dir, 0755, true);
-                    }
-                    
-                    // إنشاء اسم ملف آمن وفريد
-                    $unique_name = 'ecu_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $file_extension;
-                    $target_file = $target_dir . $unique_name;
-                    
-                    if (move_uploaded_file($_FILES['ecu_file']['tmp_name'], $target_file)) {
-                        $file_uploaded = true;
-                        $file_path = 'uploads/ecu_files/' . $unique_name;
+                    // التحقق من نوع MIME الحقيقي للملف
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $mime_type = finfo_file($finfo, $_FILES['ecu_file']['tmp_name']);
+                    finfo_close($finfo);
+                    // الأنواع المسموح بها فعليًا
+                    $allowed_mimes = [
+                        'application/pdf',
+                        'application/zip',
+                        'application/x-rar-compressed',
+                        'application/octet-stream', // bin, hex
+                    ];
+                    if (!in_array($mime_type, $allowed_mimes)) {
+                        $error_messages[] = "تم رفض الملف: النوع الحقيقي غير مدعوم ($mime_type)";
                     } else {
-                        $error_messages[] = "حدث خطأ أثناء رفع الملف";
+                        $target_dir = __DIR__ . "/uploads/ecu_files/";
+                        
+                        // إنشاء المجلد إذا لم يكن موجودًا
+                        if (!is_dir($target_dir)) {
+                            mkdir($target_dir, 0755, true);
+                        }
+                        
+                        // إنشاء اسم ملف آمن وفريد
+                        $unique_name = 'ecu_' . time() . '_' . bin2hex(random_bytes(8)) . '.' . $file_extension;
+                        $target_file = $target_dir . $unique_name;
+                        
+                        if (move_uploaded_file($_FILES['ecu_file']['tmp_name'], $target_file)) {
+                            $file_uploaded = true;
+                            $file_path = 'uploads/ecu_files/' . $unique_name;
+                        } else {
+                            $error_messages[] = "حدث خطأ أثناء رفع الملف";
+                        }
                     }
                 }
             }
@@ -634,78 +722,4 @@ ob_start();
                 }
             });
             
-            // تشغيل التحقق عند تحميل الصفحة إذا كانت هناك قيمة
-            if (chassisInput.value.length > 0) {
-                chassisInput.dispatchEvent(new Event('input'));
-            }
-        }
-        
-        // منع إرسال النموذج مرتين
-        const form = document.getElementById('ecu-form');
-        const submitBtn = document.getElementById('submit-btn');
-        
-        if (form && submitBtn) {
-            form.addEventListener('submit', function() {
-                // التحقق من صحة رقم الشاصي قبل الإرسال
-                const chassisValue = chassisInput.value.trim();
-                if (chassisValue.length !== 17) {
-                    vinValidation.textContent = '✗ رقم الشاصي يجب أن يتكون من 17 خانة بالضبط';
-                    vinValidation.className = 'vin-validation vin-invalid';
-                    chassisInput.focus();
-                    return false;
-                }
-                
-                // تعطيل زر الإرسال بعد النقر
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإرسال...';
-            });
-        }
-        
-        // إخفاء رسائل التنبيه تلقائياً بعد 8 ثوانٍ
-        const alerts = document.querySelectorAll('.alert');
-        if (alerts.length) {
-            setTimeout(() => {
-                alerts.forEach(alert => {
-                    alert.style.opacity = '0';
-                    alert.style.transition = 'opacity 0.5s';
-                    setTimeout(() => {
-                        alert.style.display = 'none';
-                    }, 500);
-                });
-            }, 8000);
-        }
-        
-        // التحقق من حجم الملف قبل الإرسال
-        const fileInput = document.getElementById('ecu_file');
-        if (fileInput) {
-            fileInput.addEventListener('change', function() {
-                if (this.files.length > 0) {
-                    const fileSize = this.files[0].size; // بالبايت
-                    const maxSize = 10 * 1024 * 1024; // 10 ميجابايت
-                    
-                    if (fileSize > maxSize) {
-                        alert('حجم الملف كبير جدًا. الحد الأقصى هو 10 ميجابايت.');
-                        this.value = ''; // مسح الملف المحدد
-                    }
-                    
-                    // التحقق من امتداد الملف
-                    const fileName = this.files[0].name;
-                    const fileExt = fileName.split('.').pop().toLowerCase();
-                    const allowedExts = ['bin', 'hex', 'zip', 'rar', 'pdf'];
-                    
-                    if (!allowedExts.includes(fileExt)) {
-                        alert('نوع الملف غير مسموح به. الأنواع المسموحة: ' + allowedExts.join(', '));
-                        this.value = ''; // مسح الملف المحدد
-                    }
-                }
-            });
-        }
-    });
-</script>
-
-<?php
-// تخزين المحتوى وعرضه في قالب layout.php
-$page_content = ob_get_clean();
-include __DIR__ . '/includes/layout.php';
-
-?>
+            //
