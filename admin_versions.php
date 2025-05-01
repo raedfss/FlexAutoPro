@@ -1,195 +1,136 @@
 <?php
 session_start();
-require_once __DIR__ . '/includes/db.php';
-
-// التحقق من تسجيل الدخول وصلاحيات المدير
-if (!isset($_SESSION['email']) || ($_SESSION['user_role'] ?? '') !== 'admin') {
+if (!isset($_SESSION['email']) || $_SESSION['role'] !== 'admin') {
     header("Location: login.php");
     exit;
 }
 
 // إعدادات الصفحة
-$page_title = 'إدارة سجل الإصدارات';
+$page_title = "إدارة سجل الإصدارات";
 $hide_title = false;
 
-// معالجة الإضافة أو التعديل أو الحذف
-$success_message = '';
-$error_message = '';
+// تضمين اتصال قاعدة البيانات
+require_once __DIR__ . '/includes/db_connection.php';
 
-// معالجة النموذج
+// التعامل مع طلبات الإضافة أو التحديث أو الحذف
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
-        try {
-            // إضافة إصدار جديد
-            if ($_POST['action'] === 'add') {
-                $stmt = $pdo->prepare("INSERT INTO versions (
-                    version_number, release_date, version_type, status, summary, details, affected_files, git_commands
-                ) VALUES (
-                    :version_number, :release_date, :version_type, :status, :summary, :details, :affected_files, :git_commands
-                )");
-                
-                $stmt->execute([
-                    'version_number' => $_POST['version_number'],
-                    'release_date' => $_POST['release_date'],
-                    'version_type' => $_POST['version_type'],
-                    'status' => $_POST['status'],
-                    'summary' => $_POST['summary'],
-                    'details' => $_POST['details'],
-                    'affected_files' => $_POST['affected_files'],
-                    'git_commands' => $_POST['git_commands']
-                ]);
-                
-                $success_message = "تمت إضافة الإصدار بنجاح";
-                header("Location: version.php");
-                 exit;
-
-            }
+        // عملية إضافة إصدار جديد
+        if ($_POST['action'] === 'add') {
+            $version_number = mysqli_real_escape_string($conn, $_POST['version_number']);
+            $release_date = mysqli_real_escape_string($conn, $_POST['release_date']);
+            $version_type = mysqli_real_escape_string($conn, $_POST['version_type']);
+            $status = mysqli_real_escape_string($conn, $_POST['status']);
+            $summary = mysqli_real_escape_string($conn, $_POST['summary']);
+            $details = mysqli_real_escape_string($conn, $_POST['details']);
+            $files_changed = mysqli_real_escape_string($conn, $_POST['files_changed']);
+            $git_commands = mysqli_real_escape_string($conn, $_POST['git_commands']);
             
-            // تعديل إصدار موجود
-            else if ($_POST['action'] === 'edit' && isset($_POST['id'])) {
-                $stmt = $pdo->prepare("UPDATE versions SET
-                    version_number = :version_number,
-                    release_date = :release_date,
-                    version_type = :version_type,
-                    status = :status,
-                    summary = :summary,
-                    details = :details,
-                    affected_files = :affected_files,
-                    git_commands = :git_commands,
-                    updated_at = CURRENT_TIMESTAMP
-                WHERE id = :id");
-                
-                $stmt->execute([
-                    'id' => $_POST['id'],
-                    'version_number' => $_POST['version_number'],
-                    'release_date' => $_POST['release_date'],
-                    'version_type' => $_POST['version_type'],
-                    'status' => $_POST['status'],
-                    'summary' => $_POST['summary'],
-                    'details' => $_POST['details'],
-                    'affected_files' => $_POST['affected_files'],
-                    'git_commands' => $_POST['git_commands']
-                ]);
-                
-                $success_message = "تم تعديل الإصدار بنجاح";
-            }
+            $sql = "INSERT INTO versions (version_number, release_date, version_type, status, summary, details, files_changed, git_commands) 
+                    VALUES ('$version_number', '$release_date', '$version_type', '$status', '$summary', '$details', '$files_changed', '$git_commands')";
             
-            // حذف إصدار
-            else if ($_POST['action'] === 'delete' && isset($_POST['id'])) {
-                $stmt = $pdo->prepare("DELETE FROM versions WHERE id = :id");
-                $stmt->execute(['id' => $_POST['id']]);
-                
-                $success_message = "تم حذف الإصدار بنجاح";
+            if (mysqli_query($conn, $sql)) {
+                $_SESSION['success_message'] = "تم إضافة الإصدار بنجاح";
+            } else {
+                $_SESSION['error_message'] = "حدث خطأ أثناء إضافة الإصدار: " . mysqli_error($conn);
             }
-        } catch (PDOException $e) {
-            $error_message = "حدث خطأ أثناء معالجة الطلب: " . $e->getMessage();
         }
+        // عملية تحديث إصدار موجود
+        else if ($_POST['action'] === 'update') {
+            $version_id = mysqli_real_escape_string($conn, $_POST['version_id']);
+            $version_number = mysqli_real_escape_string($conn, $_POST['version_number']);
+            $release_date = mysqli_real_escape_string($conn, $_POST['release_date']);
+            $version_type = mysqli_real_escape_string($conn, $_POST['version_type']);
+            $status = mysqli_real_escape_string($conn, $_POST['status']);
+            $summary = mysqli_real_escape_string($conn, $_POST['summary']);
+            $details = mysqli_real_escape_string($conn, $_POST['details']);
+            $files_changed = mysqli_real_escape_string($conn, $_POST['files_changed']);
+            $git_commands = mysqli_real_escape_string($conn, $_POST['git_commands']);
+            
+            $sql = "UPDATE versions SET 
+                    version_number = '$version_number', 
+                    release_date = '$release_date', 
+                    version_type = '$version_type', 
+                    status = '$status', 
+                    summary = '$summary', 
+                    details = '$details', 
+                    files_changed = '$files_changed', 
+                    git_commands = '$git_commands' 
+                    WHERE id = $version_id";
+            
+            if (mysqli_query($conn, $sql)) {
+                $_SESSION['success_message'] = "تم تحديث الإصدار بنجاح";
+            } else {
+                $_SESSION['error_message'] = "حدث خطأ أثناء تحديث الإصدار: " . mysqli_error($conn);
+            }
+        }
+        // عملية حذف إصدار
+        else if ($_POST['action'] === 'delete') {
+            $version_id = mysqli_real_escape_string($conn, $_POST['version_id']);
+            
+            $sql = "DELETE FROM versions WHERE id = $version_id";
+            
+            if (mysqli_query($conn, $sql)) {
+                $_SESSION['success_message'] = "تم حذف الإصدار بنجاح";
+            } else {
+                $_SESSION['error_message'] = "حدث خطأ أثناء حذف الإصدار: " . mysqli_error($conn);
+            }
+        }
+        
+        // إعادة توجيه لتفادي إعادة الإرسال عند تحديث الصفحة
+        header("Location: admin_versions.php");
+        exit;
     }
 }
 
-// استعلام عن الإصدارات المخزنة
-try {
-    $stmt = $pdo->query("SELECT * FROM versions ORDER BY release_date DESC, version_number DESC");
-    $versions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    // إذا كان الخطأ بسبب عدم وجود الجدول، قم بإنشائه
-    if (strpos($e->getMessage(), 'relation "versions" does not exist') !== false) {
-        try {
-            // إنشاء جدول الإصدارات
-            $pdo->exec("CREATE TABLE versions (
-                id SERIAL PRIMARY KEY,
-                version_number VARCHAR(20) NOT NULL,
-                release_date DATE NOT NULL,
-                version_type VARCHAR(20) NOT NULL DEFAULT 'major',
-                status VARCHAR(20) NOT NULL DEFAULT 'stable',
-                summary TEXT NOT NULL,
-                details TEXT NOT NULL,
-                affected_files TEXT,
-                git_commands TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )");
-            
-            // إضافة بعض البيانات الافتراضية
-            $stmt = $pdo->prepare("INSERT INTO versions 
-                (version_number, release_date, version_type, status, summary, details) 
-                VALUES 
-                ('v1.1.0', CURRENT_DATE, 'major', 'stable', 'نسخة مستقرة جديدة مع تحسينات شاملة', 'تنظيم الكود وتحسين نماذج التذاكر، صفحة ECU الجديدة، التحقق من إدخال البيانات'),
-                ('v1.0.2', CURRENT_DATE - INTERVAL '7 days', 'minor', 'latest', 'تحديث صفحة key-code.php بالكامل', 'إعادة تنظيم الكود، تحسين التصميم والرسائل الظاهرة')");
-            $stmt->execute();
-            
-            $success_message = "تم إنشاء جدول الإصدارات بنجاح وإضافة بيانات افتراضية.";
-            
-            // محاولة استرداد البيانات مرة أخرى
-            $stmt = $pdo->query("SELECT * FROM versions ORDER BY release_date DESC, version_number DESC");
-            $versions = $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (PDOException $e2) {
-            $error_message = "حدث خطأ أثناء إنشاء الجدول: " . $e2->getMessage();
-            $versions = [];
-        }
-    } else {
-        $error_message = "حدث خطأ أثناء استرجاع البيانات: " . $e->getMessage();
-        $versions = [];
+// جلب جميع الإصدارات
+$sql = "SELECT * FROM versions ORDER BY CAST(version_number AS DECIMAL(10,2)) DESC";
+$result = mysqli_query($conn, $sql);
+$versions = [];
+
+if (mysqli_num_rows($result) > 0) {
+    while ($row = mysqli_fetch_assoc($result)) {
+        $versions[] = $row;
     }
 }
 
-// دالة لعرض أسماء أنواع الإصدارات بالعربية
-function getVersionTypeName($type) {
-    $types = [
-        'major' => 'رئيسي',
-        'minor' => 'ثانوي',
-        'patch' => 'ترقيع'
-    ];
-    return $types[$type] ?? $type;
-}
-
-// دالة لعرض أسماء حالات الإصدارات بالعربية
-function getStatusName($status) {
-    $statuses = [
-        'stable' => 'مستقر',
-        'latest' => 'أحدث',
-        'beta' => 'تجريبي',
-        'alpha' => 'مبدئي'
-    ];
-    return $statuses[$status] ?? $status;
-}
-
-// تحديد CSS الخاص بالصفحة
+// تحديد التنسيقات الخاصة بالصفحة
 $page_css = '
 <style>
-    .admin-versions-container {
-        max-width: 1000px;
+    .versions-admin-container {
+        max-width: 1200px;
         margin: 0 auto;
         padding: 20px;
     }
     
-    .admin-versions-header {
+    .admin-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 30px;
-        padding-bottom: 15px;
+        margin-bottom: 20px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 15px;
     }
     
-    .admin-versions-header h1 {
-        margin: 0;
+    .admin-header h1 {
         color: #00d9ff;
+        font-size: 24px;
+        margin: 0;
     }
     
-    .add-version-btn {
-        background: linear-gradient(145deg, #00d9ff, #0056b3);
-        color: white;
+    .btn-add-version {
+        background-color: #00d9ff;
+        color: #0f172a;
         border: none;
         padding: 10px 20px;
-        border-radius: 8px;
+        border-radius: 4px;
+        font-weight: 600;
         cursor: pointer;
-        font-weight: bold;
         transition: all 0.3s;
     }
     
-    .add-version-btn:hover {
-        background: linear-gradient(145deg, #00d9ff, #003c80);
+    .btn-add-version:hover {
+        background-color: #00c2e6;
         transform: translateY(-2px);
     }
     
@@ -197,6 +138,7 @@ $page_css = '
         width: 100%;
         border-collapse: collapse;
         margin-top: 20px;
+        background-color: rgba(30, 41, 59, 0.5);
         border-radius: 8px;
         overflow: hidden;
     }
@@ -208,159 +150,176 @@ $page_css = '
     }
     
     .versions-table th {
-        background-color: #1a2234;
+        background-color: rgba(15, 23, 42, 0.8);
         color: #00d9ff;
-        font-weight: bold;
+        font-weight: 600;
+    }
+    
+    .versions-table tr:last-child td {
+        border-bottom: none;
     }
     
     .versions-table tr:hover {
-        background-color: rgba(0, 217, 255, 0.05);
+        background-color: rgba(15, 23, 42, 0.5);
     }
     
-    .versions-table .status {
-        display: inline-block;
+    .badge {
         padding: 5px 10px;
         border-radius: 4px;
         font-size: 12px;
-        font-weight: bold;
+        font-weight: 600;
     }
     
-    .status-stable {
-        background-color: rgba(0, 255, 136, 0.15);
-        color: #00ff88;
-    }
-    
-    .status-latest {
-        background-color: rgba(255, 204, 0, 0.15);
-        color: #ffcc00;
-    }
-    
-    .status-beta {
-        background-color: rgba(255, 107, 107, 0.15);
-        color: #ff6b6b;
-    }
-    
-    .status-alpha {
-        background-color: rgba(148, 82, 255, 0.15);
-        color: #9452ff;
-    }
-    
-    .type-major {
+    .badge-major {
         background-color: rgba(0, 217, 255, 0.15);
         color: #00d9ff;
     }
     
-    .type-minor {
+    .badge-minor {
         background-color: rgba(255, 204, 0, 0.15);
         color: #ffcc00;
     }
     
-    .type-patch {
+    .badge-patch {
         background-color: rgba(148, 82, 255, 0.15);
         color: #9452ff;
     }
     
-    .action-buttons {
-        display: flex;
-        gap: 8px;
+    .badge-stable {
+        background-color: rgba(0, 255, 136, 0.15);
+        color: #00ff88;
     }
     
-    .edit-btn, .delete-btn {
-        padding: 6px 12px;
-        border: none;
+    .badge-beta {
+        background-color: rgba(255, 107, 107, 0.15);
+        color: #ff6b6b;
+    }
+    
+    .badge-alpha {
+        background-color: rgba(148, 82, 255, 0.15);
+        color: #9452ff;
+    }
+    
+    .badge-latest {
+        background-color: rgba(255, 204, 0, 0.15);
+        color: #ffcc00;
+    }
+    
+    .actions-cell {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+    }
+    
+    .btn-edit, .btn-delete {
+        padding: 5px 10px;
         border-radius: 4px;
         cursor: pointer;
         font-size: 13px;
-        transition: all 0.3s;
+        border: none;
+        transition: all 0.2s;
     }
     
-    .edit-btn {
-        background-color: rgba(0, 217, 255, 0.2);
+    .btn-edit {
+        background-color: rgba(0, 217, 255, 0.15);
         color: #00d9ff;
+        border: 1px solid rgba(0, 217, 255, 0.3);
     }
     
-    .delete-btn {
-        background-color: rgba(255, 107, 107, 0.2);
+    .btn-delete {
+        background-color: rgba(255, 107, 107, 0.15);
         color: #ff6b6b;
+        border: 1px solid rgba(255, 107, 107, 0.3);
     }
     
-    .edit-btn:hover {
-        background-color: rgba(0, 217, 255, 0.4);
+    .btn-edit:hover, .btn-delete:hover {
+        transform: translateY(-2px);
     }
     
-    .delete-btn:hover {
-        background-color: rgba(255, 107, 107, 0.4);
-    }
-    
-    .alert {
-        padding: 15px;
-        margin-bottom: 20px;
-        border-radius: 5px;
-    }
-    
-    .alert-success {
-        background-color: rgba(0, 255, 136, 0.1);
-        color: #00ff88;
-        border-right: 4px solid #00ff88;
-    }
-    
-    .alert-error {
-        background-color: rgba(255, 107, 107, 0.1);
-        color: #ff6b6b;
-        border-right: 4px solid #ff6b6b;
-    }
-    
-    /* نموذج الإضافة/التعديل */
-    .version-form-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.8);
+    /* تنسيق النموذج المنبثق */
+    .modal {
         display: none;
-        justify-content: center;
-        align-items: center;
+        position: fixed;
         z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0, 0, 0, 0.7);
     }
     
-    .version-form {
+    .modal-content {
         background-color: #1e293b;
+        margin: 5% auto;
         padding: 25px;
-        border-radius: 10px;
-        width: 90%;
+        border-radius: 8px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        width: 80%;
         max-width: 800px;
-        max-height: 90vh;
+        max-height: 85vh;
         overflow-y: auto;
+        direction: rtl;
     }
     
-    .version-form h2 {
-        color: #00d9ff;
-        margin-top: 0;
-        margin-bottom: 25px;
-        padding-bottom: 15px;
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 15px;
+    }
+    
+    .modal-header h2 {
+        color: #00d9ff;
+        margin: 0;
+        font-size: 20px;
+    }
+    
+    .close {
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    
+    .close:hover {
+        color: #00d9ff;
+    }
+    
+    .form-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
     }
     
     .form-group {
-        margin-bottom: 20px;
+        margin-bottom: 15px;
     }
     
     .form-group label {
         display: block;
-        margin-bottom: 8px;
-        font-weight: bold;
-        color: #f8fafc;
+        margin-bottom: 5px;
+        color: #e2e8f0;
+        font-weight: 500;
     }
     
     .form-control {
         width: 100%;
-        padding: 12px;
+        padding: 10px;
+        border-radius: 4px;
         background-color: #0f172a;
         border: 1px solid #2d3748;
-        border-radius: 5px;
-        color: #f8fafc;
-        font-size: 16px;
+        color: #e2e8f0;
+        font-family: inherit;
+        font-size: 14px;
+    }
+    
+    .form-control:focus {
+        border-color: #00d9ff;
+        outline: none;
+        box-shadow: 0 0 0 2px rgba(0, 217, 255, 0.2);
     }
     
     textarea.form-control {
@@ -368,68 +327,103 @@ $page_css = '
         resize: vertical;
     }
     
-    .form-row {
-        display: flex;
-        gap: 15px;
+    .full-width {
+        grid-column: 1 / -1;
+    }
+    
+    .btn-submit {
+        background-color: #00d9ff;
+        color: #0f172a;
+        border: none;
+        padding: 12px 20px;
+        border-radius: 4px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+        width: 100%;
+        margin-top: 20px;
+    }
+    
+    .btn-submit:hover {
+        background-color: #00c2e6;
+    }
+    
+    .alert {
+        padding: 15px;
+        border-radius: 4px;
         margin-bottom: 20px;
     }
     
-    .form-col {
-        flex: 1;
+    .alert-success {
+        background-color: rgba(0, 255, 136, 0.15);
+        color: #00ff88;
+        border: 1px solid rgba(0, 255, 136, 0.3);
     }
     
-    .form-actions {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 30px;
+    .alert-error {
+        background-color: rgba(255, 107, 107, 0.15);
+        color: #ff6b6b;
+        border: 1px solid rgba(255, 107, 107, 0.3);
     }
     
-    .form-actions button {
-        padding: 12px 25px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: bold;
-        transition: all 0.3s;
-    }
-    
-    .save-btn {
-        background: linear-gradient(145deg, #00d9ff, #0056b3);
-        color: white;
-    }
-    
-    .cancel-btn {
-        background-color: #2d3748;
-        color: #f8fafc;
-    }
-    
-    .save-btn:hover {
-        background: linear-gradient(145deg, #00d9ff, #003c80);
-    }
-    
-    .cancel-btn:hover {
-        background-color: #3e4c6a;
-    }
-    
-    .back-link {
-        margin-top: 30px;
+    .confirm-delete-modal {
+        max-width: 400px;
         text-align: center;
     }
     
-    .back-link a {
-        display: inline-block;
-        background-color: #1e293b;
-        color: #f8fafc;
-        padding: 10px 20px;
-        border-radius: 5px;
-        transition: all 0.3s;
-        text-decoration: none;
-        border: 1px solid #2d3748;
+    .confirm-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+        margin-top: 20px;
     }
     
-    .back-link a:hover {
-        background-color: #2d3748;
-        transform: translateY(-2px);
+    .btn-cancel {
+        background-color: #334155;
+        color: #e2e8f0;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .btn-confirm-delete {
+        background-color: #ff6b6b;
+        color: #fff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .btn-cancel:hover, .btn-confirm-delete:hover {
+        opacity: 0.9;
+    }
+    
+    @media (max-width: 768px) {
+        .form-grid {
+            grid-template-columns: 1fr;
+        }
+        
+        .modal-content {
+            width: 95%;
+            margin: 10% auto;
+        }
+        
+        .versions-table {
+            font-size: 14px;
+        }
+        
+        .versions-table th, .versions-table td {
+            padding: 8px 10px;
+        }
+        
+        .actions-cell {
+            flex-direction: column;
+            gap: 5px;
+        }
     }
 </style>';
 
@@ -437,18 +431,28 @@ $page_css = '
 ob_start();
 ?>
 
-<div class="admin-versions-container">
-    <div class="admin-versions-header">
-        <h1>إدارة سجل الإصدارات</h1>
-        <button class="add-version-btn" onclick="showVersionForm()">+ إضافة إصدار جديد</button>
+<div class="versions-admin-container">
+    <div class="admin-header">
+        <h1>إدارة سجل الإصدارات - مشروع فلكس أوتو</h1>
+        <button class="btn-add-version" id="btnAddVersion">إضافة إصدار جديد</button>
     </div>
     
-    <?php if (!empty($success_message)): ?>
-        <div class="alert alert-success"><?= $success_message ?></div>
+    <?php if (isset($_SESSION['success_message'])): ?>
+        <div class="alert alert-success">
+            <?php 
+            echo $_SESSION['success_message']; 
+            unset($_SESSION['success_message']);
+            ?>
+        </div>
     <?php endif; ?>
     
-    <?php if (!empty($error_message)): ?>
-        <div class="alert alert-error"><?= $error_message ?></div>
+    <?php if (isset($_SESSION['error_message'])): ?>
+        <div class="alert alert-error">
+            <?php 
+            echo $_SESSION['error_message']; 
+            unset($_SESSION['error_message']);
+            ?>
+        </div>
     <?php endif; ?>
     
     <table class="versions-table">
@@ -459,25 +463,33 @@ ob_start();
                 <th>النوع</th>
                 <th>الحالة</th>
                 <th>ملخص</th>
-                <th>الإجراءات</th>
+                <th>إجراءات</th>
             </tr>
         </thead>
         <tbody>
             <?php if (empty($versions)): ?>
                 <tr>
-                    <td colspan="6" style="text-align: center;">لا توجد إصدارات مسجلة بعد</td>
+                    <td colspan="6" style="text-align: center;">لا توجد إصدارات لعرضها</td>
                 </tr>
             <?php else: ?>
                 <?php foreach ($versions as $version): ?>
-                    <tr data-id="<?= $version['id'] ?>">
-                        <td><?= htmlspecialchars($version['version_number']) ?></td>
-                        <td><?= date('Y-m-d', strtotime($version['release_date'])) ?></td>
-                        <td><span class="status type-<?= $version['version_type'] ?>"><?= getVersionTypeName($version['version_type']) ?></span></td>
-                        <td><span class="status status-<?= $version['status'] ?>"><?= getStatusName($version['status']) ?></span></td>
-                        <td><?= htmlspecialchars(mb_substr($version['summary'], 0, 50)) . (mb_strlen($version['summary']) > 50 ? '...' : '') ?></td>
-                        <td class="action-buttons">
-                            <button class="edit-btn" onclick="editVersion(<?= $version['id'] ?>)">تعديل</button>
-                            <button class="delete-btn" onclick="deleteVersion(<?= $version['id'] ?>, '<?= htmlspecialchars($version['version_number']) ?>')">حذف</button>
+                    <tr>
+                        <td><?php echo htmlspecialchars($version['version_number']); ?></td>
+                        <td><?php echo htmlspecialchars($version['release_date']); ?></td>
+                        <td>
+                            <span class="badge badge-<?php echo strtolower($version['version_type']); ?>">
+                                <?php echo htmlspecialchars($version['version_type']); ?>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge badge-<?php echo strtolower($version['status']); ?>">
+                                <?php echo htmlspecialchars($version['status']); ?>
+                            </span>
+                        </td>
+                        <td><?php echo mb_substr(htmlspecialchars($version['summary']), 0, 50) . (mb_strlen($version['summary']) > 50 ? '...' : ''); ?></td>
+                        <td class="actions-cell">
+                            <button class="btn-edit" onclick="editVersion(<?php echo $version['id']; ?>)">تعديل</button>
+                            <button class="btn-delete" onclick="confirmDelete(<?php echo $version['id']; ?>, '<?php echo htmlspecialchars($version['version_number']); ?>')">حذف</button>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -485,181 +497,185 @@ ob_start();
         </tbody>
     </table>
     
-    <div class="back-link">
-        <a href="home.php">العودة للصفحة الرئيسية</a>
-    </div>
-</div>
-
-<!-- نموذج إضافة/تعديل الإصدار -->
-<div class="version-form-overlay" id="versionFormOverlay">
-    <div class="version-form">
-        <h2 id="formTitle">إضافة إصدار جديد</h2>
-        <form id="versionForm" method="POST" action="">
-            <input type="hidden" name="action" id="formAction" value="add">
-            <input type="hidden" name="id" id="versionId" value="">
+    <!-- نموذج إضافة/تعديل إصدار -->
+    <div id="versionModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">إضافة إصدار جديد</h2>
+                <span class="close">&times;</span>
+            </div>
             
-            <div class="form-row">
-                <div class="form-col">
+            <form id="versionForm" method="POST">
+                <input type="hidden" name="action" id="formAction" value="add">
+                <input type="hidden" name="version_id" id="versionId" value="">
+                
+                <div class="form-grid">
                     <div class="form-group">
                         <label for="version_number">رقم الإصدار</label>
-                        <input type="text" class="form-control" id="version_number" name="version_number" placeholder="مثال: v1.2.0" required>
+                        <input type="text" class="form-control" id="version_number" name="version_number" required>
                     </div>
-                </div>
-                <div class="form-col">
+                    
                     <div class="form-group">
                         <label for="release_date">تاريخ الإصدار</label>
                         <input type="date" class="form-control" id="release_date" name="release_date" required>
                     </div>
-                </div>
-            </div>
-            
-            <div class="form-row">
-                <div class="form-col">
+                    
                     <div class="form-group">
                         <label for="version_type">نوع الإصدار</label>
                         <select class="form-control" id="version_type" name="version_type" required>
-                            <option value="major">رئيسي (Major)</option>
-                            <option value="minor">ثانوي (Minor)</option>
-                            <option value="patch">ترقيع (Patch)</option>
+                            <option value="Major">إصدار رئيسي (Major)</option>
+                            <option value="Minor">إصدار ثانوي (Minor)</option>
+                            <option value="Patch">تحديث (Patch)</option>
                         </select>
                     </div>
-                </div>
-                <div class="form-col">
+                    
                     <div class="form-group">
                         <label for="status">حالة الإصدار</label>
                         <select class="form-control" id="status" name="status" required>
-                            <option value="stable">مستقر</option>
-                            <option value="latest">أحدث إصدار</option>
-                            <option value="beta">تجريبي (بيتا)</option>
-                            <option value="alpha">مبدئي (ألفا)</option>
+                            <option value="Stable">مستقر (Stable)</option>
+                            <option value="Latest">أحدث إصدار (Latest)</option>
+                            <option value="Beta">تجريبي (Beta)</option>
+                            <option value="Alpha">نموذج أولي (Alpha)</option>
                         </select>
                     </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="summary">ملخص الإصدار</label>
+                        <textarea class="form-control" id="summary" name="summary" required></textarea>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="details">تفاصيل الإصدار (استخدم * للعناصر)</label>
+                        <textarea class="form-control" id="details" name="details" rows="5" required></textarea>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="files_changed">الملفات المتغيرة</label>
+                        <textarea class="form-control" id="files_changed" name="files_changed"></textarea>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="git_commands">أوامر Git (اختياري)</label>
+                        <textarea class="form-control" id="git_commands" name="git_commands"></textarea>
+                    </div>
                 </div>
+                
+                <button type="submit" class="btn-submit" id="btnSubmit">حفظ الإصدار</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- نموذج تأكيد الحذف -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content confirm-delete-modal">
+            <div class="modal-header">
+                <h2>تأكيد الحذف</h2>
+                <span class="close">&times;</span>
             </div>
             
-            <div class="form-group">
-                <label for="summary">ملخص الإصدار</label>
-                <input type="text" class="form-control" id="summary" name="summary" placeholder="وصف مختصر للإصدار" required>
-            </div>
+            <p>هل أنت متأكد من رغبتك في حذف الإصدار <span id="deleteVersionNumber"></span>؟</p>
+            <p>لا يمكن التراجع عن هذا الإجراء.</p>
             
-            <div class="form-group">
-                <label for="details">تفاصيل الإصدار</label>
-                <textarea class="form-control" id="details" name="details" placeholder="تفاصيل التغييرات والإضافات في هذا الإصدار" rows="5" required></textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="affected_files">الملفات المتأثرة</label>
-                <textarea class="form-control" id="affected_files" name="affected_files" placeholder="قائمة بالملفات التي تم تعديلها أو إضافتها" rows="3"></textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="git_commands">أوامر Git</label>
-                <textarea class="form-control" id="git_commands" name="git_commands" placeholder="أوامر Git المستخدمة لهذا الإصدار" rows="4"></textarea>
-            </div>
-            
-            <div class="form-actions">
-                <button type="button" class="cancel-btn" onclick="hideVersionForm()">إلغاء</button>
-                <button type="submit" class="save-btn" id="saveButton">حفظ الإصدار</button>
-            </div>
-        </form>
+            <form id="deleteForm" method="POST">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="version_id" id="deleteVersionId" value="">
+                
+                <div class="confirm-actions">
+                    <button type="button" class="btn-cancel" id="btnCancelDelete">إلغاء</button>
+                    <button type="submit" class="btn-confirm-delete">تأكيد الحذف</button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
-<!-- نموذج حذف الإصدار -->
-<form id="deleteForm" method="POST" action="" style="display: none;">
-    <input type="hidden" name="action" value="delete">
-    <input type="hidden" name="id" id="deleteId" value="">
-</form>
-
 <script>
-    // تعيين تاريخ اليوم كقيمة افتراضية لحقل التاريخ
-    document.addEventListener('DOMContentLoaded', function() {
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('release_date').value = today;
-    });
-    
-    // عرض نموذج إضافة إصدار جديد
-    function showVersionForm() {
-        document.getElementById('versionFormOverlay').style.display = 'flex';
-        document.getElementById('formTitle').textContent = 'إضافة إصدار جديد';
+    // استدعاء النموذج عند النقر على زر الإضافة
+    document.getElementById('btnAddVersion').addEventListener('click', function() {
+        document.getElementById('modalTitle').textContent = 'إضافة إصدار جديد';
         document.getElementById('formAction').value = 'add';
         document.getElementById('versionForm').reset();
+        document.getElementById('versionId').value = '';
         
-        // تعيين تاريخ اليوم
+        // تعيين تاريخ اليوم كقيمة افتراضية
         const today = new Date().toISOString().split('T')[0];
         document.getElementById('release_date').value = today;
-    }
+        
+        document.getElementById('versionModal').style.display = 'block';
+    });
     
-    // إخفاء النموذج
-    function hideVersionForm() {
-        document.getElementById('versionFormOverlay').style.display = 'none';
-    }
+    // إغلاق النماذج المنبثقة
+    const closeButtons = document.querySelectorAll('.close');
+    closeButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            document.getElementById('versionModal').style.display = 'none';
+            document.getElementById('deleteModal').style.display = 'none';
+        });
+    });
     
-    // عرض نموذج تعديل إصدار
-    function editVersion(id) {
-        // بيانات الصف في الجدول
-        const row = document.querySelector(`tr[data-id="${id}"]`);
-        if (!row) {
-            alert('حدث خطأ أثناء استرجاع بيانات الإصدار');
-            return;
+    // إغلاق النموذج عند النقر خارجه
+    window.addEventListener('click', function(event) {
+        if (event.target === document.getElementById('versionModal')) {
+            document.getElementById('versionModal').style.display = 'none';
         }
-        
-        // تعبئة النموذج من البيانات الموجودة في الصف
-        document.getElementById('versionId').value = id;
-        document.getElementById('version_number').value = row.querySelector('td:nth-child(1)').textContent.trim();
-        document.getElementById('release_date').value = row.querySelector('td:nth-child(2)').textContent.trim();
-        
-        // استخلاص نوع الإصدار من الكلاس
-        const typeSpan = row.querySelector('td:nth-child(3) .status');
-        const typeClass = typeSpan.className.match(/type-(\w+)/)[1];
-        document.getElementById('version_type').value = typeClass;
-        
-        // استخلاص حالة الإصدار من الكلاس
-        const statusSpan = row.querySelector('td:nth-child(4) .status');
-        const statusClass = statusSpan.className.match(/status-(\w+)/)[1];
-        document.getElementById('status').value = statusClass;
-        
-        // محاولة الحصول على البيانات الإضافية عبر AJAX
-        fetch(`get_version.php?id=${id}`)
+        if (event.target === document.getElementById('deleteModal')) {
+            document.getElementById('deleteModal').style.display = 'none';
+        }
+    });
+    
+    // تحديد بيانات الإصدار للتعديل
+    function editVersion(versionId) {
+        // طلب AJAX لجلب بيانات الإصدار
+        fetch('get_version.php?id=' + versionId)
             .then(response => response.json())
             .then(data => {
-                if (data.error) {
-                    console.error('Error:', data.error);
-                    // لا نعمل شيء، سنستخدم البيانات المتاحة بالفعل
+                if (data.success) {
+                    const version = data.version;
+                    
+                    document.getElementById('modalTitle').textContent = 'تعديل الإصدار ' + version.version_number;
+                    document.getElementById('formAction').value = 'update';
+                    document.getElementById('versionId').value = version.id;
+                    document.getElementById('version_number').value = version.version_number;
+                    document.getElementById('release_date').value = version.release_date;
+                    document.getElementById('version_type').value = version.version_type;
+                    document.getElementById('status').value = version.status;
+                    document.getElementById('summary').value = version.summary;
+                    document.getElementById('details').value = version.details;
+                    document.getElementById('files_changed').value = version.files_changed;
+                    document.getElementById('git_commands').value = version.git_commands;
+                    
+                    document.getElementById('versionModal').style.display = 'block';
                 } else {
-                    // تعبئة البيانات الإضافية
-                    document.getElementById('summary').value = data.summary || '';
-                    document.getElementById('details').value = data.details || '';
-                    document.getElementById('affected_files').value = data.affected_files || '';
-                    document.getElementById('git_commands').value = data.git_commands || '';
+                    alert('حدث خطأ أثناء جلب بيانات الإصدار');
                 }
             })
             .catch(error => {
-                console.error('Error fetching version details:', error);
-                // في حالة فشل الحصول على البيانات، نستخدم البيانات المتاحة
-                document.getElementById('summary').value = row.querySelector('td:nth-child(5)').textContent.trim();
+                console.error('Error:', error);
+                alert('حدث خطأ في الاتصال بالخادم');
             });
-        
-        // عنوان النموذج وإجراء النموذج
-        document.getElementById('formTitle').textContent = 'تعديل الإصدار';
-        document.getElementById('formAction').value = 'edit';
-        
-        // عرض النموذج
-        document.getElementById('versionFormOverlay').style.display = 'flex';
     }
     
-    // حذف إصدار
-    function deleteVersion(id, versionNumber) {
-        if (confirm(`هل أنت متأكد من حذف الإصدار ${versionNumber}؟`)) {
-            document.getElementById('deleteId').value = id;
-            document.getElementById('deleteForm').submit();
-        }
+    // تأكيد حذف الإصدار
+    function confirmDelete(versionId, versionNumber) {
+        document.getElementById('deleteVersionId').value = versionId;
+        document.getElementById('deleteVersionNumber').textContent = versionNumber;
+        document.getElementById('deleteModal').style.display = 'block';
     }
     
-    // إغلاق النموذج عند النقر خارجه
-    document.getElementById('versionFormOverlay').addEventListener('click', function(e) {
-        if (e.target === this) {
-            hideVersionForm();
+    // إلغاء الحذف
+    document.getElementById('btnCancelDelete').addEventListener('click', function() {
+        document.getElementById('deleteModal').style.display = 'none';
+    });
+    
+    // التحقق من الإدخالات قبل الإرسال
+    document.getElementById('versionForm').addEventListener('submit', function(event) {
+        const version_number = document.getElementById('version_number').value;
+        const summary = document.getElementById('summary').value;
+        const details = document.getElementById('details').value;
+        
+        if (!version_number || !summary || !details) {
+            event.preventDefault();
+            alert('يرجى ملء جميع الحقول المطلوبة');
         }
     });
 </script>
