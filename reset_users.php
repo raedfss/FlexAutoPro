@@ -54,28 +54,71 @@ if (!isset($_POST['confirm']) && php_sapi_name() !== 'cli') {
 // اتصال بقاعدة البيانات
 require_once 'includes/db.php';
 
+// دالة للتحقق من وجود الجدول
+function tableExists($pdo, $table) {
+    try {
+        $result = $pdo->query("SELECT 1 FROM {$table} LIMIT 1");
+        return $result !== false;
+    } catch (Exception $e) {
+        return false;
+    }
+}
+
+// دالة لحذف بيانات الجدول إذا كان موجودًا
+function safeDeleteTable($pdo, $table) {
+    if (tableExists($pdo, $table)) {
+        echo "جاري حذف البيانات من جدول {$table}...\n";
+        $pdo->exec("DELETE FROM {$table}");
+        return true;
+    } else {
+        echo "جدول {$table} غير موجود، تم تخطي الحذف.\n";
+        return false;
+    }
+}
+
 // الآن سنقوم بالعملية
 try {
     // بدء المعاملة لضمان التنفيذ الكامل أو الإلغاء الكامل
     $pdo->beginTransaction();
     
-    // 1. حذف جميع البيانات المرتبطة
-    echo "جاري حذف سجلات النشاط...\n";
-    $pdo->exec("DELETE FROM activity_logs");
+    // 1. حذف البيانات المرتبطة من الجداول المحتملة
+    // لن نستخدم DELETE مباشرة، بل سنتحقق أولاً من وجود الجدول
+    $related_tables = [
+        'activity_logs', 
+        'login_logs', 
+        'airbag_resets',
+        'password_resets',
+        'user_sessions',
+        'user_logs',
+        'user_devices',
+        // يمكنك إضافة المزيد من الجداول هنا
+    ];
     
-    echo "جاري حذف سجلات تسجيل الدخول...\n";
-    $pdo->exec("DELETE FROM login_logs");
+    // التحقق من كل جدول وحذف البيانات منه إذا كان موجودًا
+    foreach ($related_tables as $table) {
+        safeDeleteTable($pdo, $table);
+    }
     
-    // حذف السجلات من الجداول الأخرى التي قد تحتوي على foreign keys
-    // يمكن إضافة المزيد حسب هيكل قاعدة البيانات
-    echo "جاري حذف البيانات من الجداول المرتبطة...\n";
-    $pdo->exec("DELETE FROM airbag_resets"); // مثال - أضف المزيد حسب هيكل قاعدة البيانات
+    // 2. التحقق من وجود جدول المستخدمين
+    if (!tableExists($pdo, 'users')) {
+        throw new Exception("جدول المستخدمين (users) غير موجود في قاعدة البيانات! تأكد من الاتصال بقاعدة البيانات الصحيحة.");
+    }
     
-    // 2. حذف جميع المستخدمين
+    // 3. حذف جميع المستخدمين
     echo "جاري حذف جميع المستخدمين...\n";
     $pdo->exec("DELETE FROM users");
     
-    // 3. إنشاء المستخدمين الجدد
+    // 4. جلب هيكل جدول المستخدمين للتأكد من الأعمدة المتاحة
+    echo "جاري التحقق من هيكل جدول المستخدمين...\n";
+    $columns = [];
+    $columnsQuery = $pdo->query("SELECT column_name FROM information_schema.columns WHERE table_name = 'users'");
+    while ($column = $columnsQuery->fetchColumn()) {
+        $columns[] = strtolower($column);
+    }
+    
+    echo "الأعمدة المتاحة في جدول المستخدمين: " . implode(", ", $columns) . "\n";
+    
+    // 5. إنشاء المستخدمين الجدد
     echo "جاري إنشاء المستخدمين الجدد...\n";
     
     // تهيئة المستخدمين
@@ -118,25 +161,79 @@ try {
         ]
     ];
     
-    // تحضير استعلام الإدخال
-    $stmt = $pdo->prepare("
-        INSERT INTO users (email, username, password, fullname, role, is_active, created_at) 
-        VALUES (:email, :username, :password, :fullname, :role, :is_active, NOW())
-    ");
+    // التحقق من وجود الأعمدة وإنشاء استعلام الإدخال المناسب
+    $availableColumns = [];
+    $values = [];
+    
+    // الأعمدة الأساسية المطلوبة
+    $requiredColumns = ['email', 'username', 'password'];
+    
+    // التحقق من وجود الأعمدة الأساسية
+    foreach ($requiredColumns as $col) {
+        if (!in_array(strtolower($col), $columns)) {
+            throw new Exception("العمود الأساسي '{$col}' غير موجود في جدول المستخدمين!");
+        }
+    }
+    
+    // الأعمدة المحتملة وقيمها الافتراضية
+    $potentialColumns = [
+        'email' => null,
+        'username' => null,
+        'password' => null,
+        'fullname' => null,
+        'role' => 'user',
+        'is_active' => 1,
+        'created_at' => 'NOW()',
+        'updated_at' => 'NOW()',
+        'login_attempts' => 0,
+        'lockout_time' => null,
+        'last_login' => null
+    ];
+    
+    // تحديد الأعمدة المتاحة للإدخال
+    foreach ($potentialColumns as $col => $default) {
+        if (in_array(strtolower($col), $columns)) {
+            $availableColumns[] = $col;
+            if ($default !== null && $col !== 'created_at' && $col !== 'updated_at') {
+                $values[] = ":{$col}";
+            } else if ($col === 'created_at' || $col === 'updated_at') {
+                $values[] = $default;
+            } else {
+                $values[] = ":{$col}";
+            }
+        }
+    }
+    
+    // إنشاء استعلام الإدخال الديناميكي
+    $columnsStr = implode(', ', $availableColumns);
+    $valuesStr = implode(', ', $values);
+    $sql = "INSERT INTO users ({$columnsStr}) VALUES ({$valuesStr})";
+    
+    echo "استعلام الإدخال: {$sql}\n";
+    $stmt = $pdo->prepare($sql);
     
     // إدخال كل مستخدم
     foreach ($users as $user) {
-        // تشفير كلمة المرور
-        $hashed_password = password_hash($user['password'], PASSWORD_DEFAULT);
+        // تجهيز البيانات للإدخال
+        $data = [];
+        foreach ($availableColumns as $col) {
+            if ($col === 'created_at' || $col === 'updated_at') {
+                // سيتم استخدام NOW() من السيرفر
+                continue;
+            } else if ($col === 'password') {
+                // تشفير كلمة المرور
+                $data[$col] = password_hash($user['password'], PASSWORD_DEFAULT);
+            } else if (isset($user[$col])) {
+                // استخدام القيمة من مصفوفة المستخدم
+                $data[$col] = $user[$col];
+            } else if (isset($potentialColumns[$col])) {
+                // استخدام القيمة الافتراضية
+                $data[$col] = $potentialColumns[$col];
+            }
+        }
         
-        $stmt->execute([
-            'email' => $user['email'],
-            'username' => $user['username'],
-            'password' => $hashed_password,
-            'fullname' => $user['fullname'],
-            'role' => $user['role'],
-            'is_active' => $user['is_active']
-        ]);
+        // تنفيذ الإدخال
+        $stmt->execute($data);
         
         echo "تم إنشاء المستخدم: {$user['email']} (كلمة المرور: {$user['password']})\n";
     }
@@ -151,9 +248,11 @@ try {
     echo "==============================================\n";
     echo "\nيرجى حذف هذا الملف الآن للحفاظ على أمان النظام!\n";
     
-} catch (PDOException $e) {
+} catch (Exception $e) {
     // التراجع عن التغييرات في حالة حدوث خطأ
-    $pdo->rollBack();
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     die("حدث خطأ: " . $e->getMessage());
 }
 
