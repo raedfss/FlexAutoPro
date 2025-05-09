@@ -5,13 +5,13 @@ session_start();
 require_once __DIR__ . '/includes/auth.php';
 
 // التحقق من تسجيل الدخول
-if (!isLoggedIn()) {
-    // إعادة التوجيه إلى صفحة تسجيل الدخول مع رسالة
+if (!isset($_SESSION['user_id'])) {
     $_SESSION['message'] = "يجب تسجيل الدخول للوصول إلى هذه الصفحة";
     $_SESSION['message_type'] = "error";
     header("Location: login.php");
     exit;
 }
+
 
 // التحقق من مستوى صلاحيات المستخدم (إذا كان مطلوبًا)
 if (!hasPermission('airbag_reset')) {
