@@ -21,12 +21,12 @@ function isLoggedIn() {
  * @return bool
  */
 function hasPermission($permission) {
-    // إذا كان المستخدم مسؤول، يمتلك جميع الصلاحيات
-    if (isAdmin()) {
+    // استدعاء دالة isAdmin() الموجودة في ملف functions.php
+    if (function_exists('isAdmin') && isAdmin()) {
         return true;
     }
     
-    // أعط جميع المستخدمين صلاحية airbag_reset مؤقتًا لتجنب مشاكل الوصول
+    // منح صلاحية airbag_reset لجميع المستخدمين مؤقتًا لتسهيل الاختبار
     if ($permission === 'airbag_reset') {
         return true;
     }
@@ -39,14 +39,6 @@ function hasPermission($permission) {
     
     // تحقق من وجود الصلاحية المطلوبة في قائمة صلاحيات المستخدم
     return in_array($permission, $_SESSION['user_permissions']);
-}
-
-/**
- * التحقق مما إذا كان المستخدم مسؤول
- * @return bool
- */
-function isAdmin() {
-    return isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin';
 }
 
 /**
@@ -81,6 +73,8 @@ function getUserRole() {
     return $_SESSION['user_role'] ?? 'user';
 }
 
-// هام: تعطيل التحقق التلقائي من تسجيل الدخول
-// الصفحة الرئيسية ستتعامل مع التحقق من تسجيل الدخول بنفسها
-// من خلال استدعاء isLoggedIn() بشكل صريح
+// ملاحظة: قمنا بإزالة دالة isAdmin() من هنا لأنها معرّفة في ملف functions.php
+// ونستخدم function_exists() للتحقق من وجودها عند استدعائها
+
+// كما قمنا بإزالة كود التحقق التلقائي وإعادة التوجيه 
+// ليتم التحكم فيه من خلال الصفحة الرئيسية
