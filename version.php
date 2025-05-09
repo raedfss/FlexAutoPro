@@ -306,12 +306,54 @@ ob_start();
     </div>
     
     <ul class="version-list">
-        <!-- إضافة الإصدار الجديد 1.1.2 -->
+        <!-- إضافة الإصدار الجديد 1.1.3 -->
+        <li class="version-item">
+            <div class="version-badge patch">1.1</div>
+            <span class="version-title">v1.1.3</span>
+            <span class="version-date">9 مايو 2025</span>
+            <span class="version-tag latest">أحدث إصدار</span>
+
+            <div class="version-summary">
+                تحسينات متفرقة في الأداء والتصميم قبل دمج وحدة الدفع الإلكتروني.
+            </div>
+
+            <div class="version-details">
+                <ul>
+                    <li>تحسين واجهة المستخدم في صفحات النظام الرئيسية وجعلها أكثر استجابة.</li>
+                    <li>إصلاح مشكلة الأخطاء في صفحة <code>ecu-tuning.php</code> وتحسين أداء تحميل الصفحة.</li>
+                    <li>تطوير صفحة <code>online-programming-ticket.php</code> وإضافة ميزات تقنية جديدة.</li>
+                    <li>تحسين صفحة الملف الشخصي <code>profile.php</code> وإضافة خيارات تخصيص أكثر للمستخدم.</li>
+                    <li>تحسين أداء النظام بشكل عام والإعداد لدمج نظام الدفع الإلكتروني.</li>
+                    <li>تصحيح الأخطاء الموجودة في صفحة <code>airbag-reset.php</code> وتعزيز أمانها.</li>
+                </ul>
+            </div>
+
+            <div class="version-files">
+                <span class="file-tag">تحديث <code>ecu-tuning.php</code></span>
+                <span class="file-tag">تحديث <code>online-programming-ticket.php</code></span>
+                <span class="file-tag">تحديث <code>profile.php</code></span>
+                <span class="file-tag">تحديث <code>airbag-reset.php</code></span>
+                <span class="file-tag">تحديث <code>version.php</code></span>
+                <span class="file-tag">تحسين <code>includes/auth.php</code></span>
+                <span class="file-tag">تحسين <code>includes/security.php</code></span>
+            </div>
+
+            <div class="git-command">
+                <span class="code-label">أوامر Git</span>
+                <button class="copy-btn" onclick="copyToClipboard(this)">نسخ</button>
+                <code>git add .
+git commit -m "📦 v1.1.3: تحسينات متفرقة في الأداء والتصميم قبل دمج وحدة الدفع"
+git tag -a v1.1.3 -m "FlexAutoPro v1.1.3 – Pre-payment integration polish"
+git push origin main
+git push origin v1.1.3</code>
+            </div>
+        </li>
+        
+        <!-- إضافة الإصدار 1.1.2 -->
         <li class="version-item">
             <div class="version-badge patch">1.1</div>
             <span class="version-title">v1.1.2</span>
-            <span class="version-date">1 May 2025</span>
-            <span class="version-tag latest">أحدث إصدار</span>
+            <span class="version-date">1 مايو 2025</span>
             <span class="version-tag security">تحديث أمني</span>
 
             <div class="version-summary">
@@ -320,74 +362,7 @@ ob_start();
 
             <div class="version-details">
                 <ul>
-                    <li>إنشاء صفحات التسجيل وتسجيل الدخول الأساسية.</li>
-                    <li>تكوين الجداول الأساسية (Users, Tickets) في قاعدة البيانات.</li>
-                    <li>تطوير الوظائف الأساسية للتعامل مع بيانات المستخدم.</li>
-                </ul>
-            </div>
-        </li>
-        
-        <li class="version-item">
-            <div class="version-badge minor">0.1</div>
-            <span class="version-title">v0.1.0</span>
-            <span class="version-date">15 فبراير 2025</span>
-            <span class="version-tag alpha">بدء المشروع</span>
-            
-            <div class="version-summary">
-                مرحلة بدء المشروع وتهيئة بيئة التطوير.
-            </div>
-            
-            <div class="version-details">
-                <ul>
-                    <li>تهيئة بيئة التطوير باستخدام XAMPP.</li>
-                    <li>إنشاء الهيكلية الأولية للملفات والمجلدات.</li>
-                    <li>وضع خطة العمل وتحديد المتطلبات الأساسية للمشروع.</li>
-                </ul>
-            </div>
-        </li>
-    </ul>
-    
-    <div class="back-link">
-        <a href="home.php">العودة للصفحة الرئيسية</a>
-    </div>
-</div>
-
-<script>
-    // دالة نسخ أوامر Git إلى الحافظة
-    function copyToClipboard(button) {
-        const gitCommandElement = button.nextElementSibling;
-        const textArea = document.createElement('textarea');
-        textArea.value = gitCommandElement.textContent;
-        document.body.appendChild(textArea);
-        textArea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textArea);
-        
-        button.textContent = 'تم النسخ!';
-        setTimeout(() => {
-            button.textContent = 'نسخ';
-        }, 2000);
-    }
-    
-    // دالة إخفاء رسائل النجاح والفشل بعد فترة
-    document.addEventListener('DOMContentLoaded', function() {
-        // إخفاء رسائل النجاح والفشل بعد 5 ثوانٍ
-        setTimeout(function() {
-            const messages = document.querySelectorAll('.alert-success, .alert-danger, .alert-warning, .alert-info');
-            messages.forEach(function(message) {
-                message.style.transition = 'opacity 0.5s ease';
-                message.style.opacity = '0';
-                setTimeout(function() {
-                    message.style.display = 'none';
-                }, 500);
-            });
-        }, 5000);
-    });
-</script>
-<?php
-$page_content = ob_get_clean();
-require_once __DIR__ . '/includes/layout.php';
-?>تعزيز حماية النظام ضد هجمات CSRF و XSS و SQL Injection لجميع نماذج الإدخال.</li>
+                    <li>تعزيز حماية النظام ضد هجمات CSRF و XSS و SQL Injection لجميع نماذج الإدخال.</li>
                     <li>تحسين التحقق من صحة البيانات باستخدام Sanitization و Validation للمدخلات.</li>
                     <li>تطبيق حماية ملفات إضافية لمنع تنفيذ أو رفع ملفات ضارة محتملة.</li>
                     <li>إضافة إشعارات نجاح وفشل ديناميكية داخل النماذج تختفي تلقائيًا بعد 5 ثوانٍ.</li>
@@ -462,7 +437,7 @@ git push origin v1.1.2</code>
         <li class="version-item">
             <div class="version-badge patch">1.1</div>
             <span class="version-title">v1.1.1</span>
-            <span class="version-date">1 May 2025</span>
+            <span class="version-date">1 مايو 2025</span>
 
             <div class="version-summary">
                 تحسينات في صفحة <code>admin_versions.php</code> وظهور صفحة سجل الإصدارات من قاعدة البيانات تلقائيًا.
@@ -682,4 +657,71 @@ git push origin v1.1.0</code>
             
             <div class="version-details">
                 <ul>
-                    <li>
+                    <li>إنشاء صفحات التسجيل وتسجيل الدخول الأساسية.</li>
+                    <li>تكوين الجداول الأساسية (Users, Tickets) في قاعدة البيانات.</li>
+                    <li>تطوير الوظائف الأساسية للتعامل مع بيانات المستخدم.</li>
+                </ul>
+            </div>
+        </li>
+        
+        <li class="version-item">
+            <div class="version-badge minor">0.1</div>
+            <span class="version-title">v0.1.0</span>
+            <span class="version-date">15 فبراير 2025</span>
+            <span class="version-tag alpha">بدء المشروع</span>
+            
+            <div class="version-summary">
+                مرحلة بدء المشروع وتهيئة بيئة التطوير.
+            </div>
+            
+            <div class="version-details">
+                <ul>
+                    <li>تهيئة بيئة التطوير باستخدام XAMPP.</li>
+                    <li>إنشاء الهيكلية الأولية للملفات والمجلدات.</li>
+                    <li>وضع خطة العمل وتحديد المتطلبات الأساسية للمشروع.</li>
+                </ul>
+            </div>
+        </li>
+    </ul>
+    
+    <div class="back-link">
+        <a href="index.php">العودة للصفحة الرئيسية</a>
+    </div>
+</div>
+
+<script>
+    // دالة نسخ أوامر Git إلى الحافظة
+    function copyToClipboard(button) {
+        const gitCommandElement = button.nextElementSibling;
+        const textArea = document.createElement('textarea');
+        textArea.value = gitCommandElement.textContent;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        button.textContent = 'تم النسخ!';
+        setTimeout(() => {
+            button.textContent = 'نسخ';
+        }, 2000);
+    }
+    
+    // دالة إخفاء رسائل النجاح والفشل بعد فترة
+    document.addEventListener('DOMContentLoaded', function() {
+        // إخفاء رسائل النجاح والفشل بعد 5 ثوانٍ
+        setTimeout(function() {
+            const messages = document.querySelectorAll('.alert-success, .alert-danger, .alert-warning, .alert-info');
+            messages.forEach(function(message) {
+                message.style.transition = 'opacity 0.5s ease';
+                message.style.opacity = '0';
+                setTimeout(function() {
+                    message.style.display = 'none';
+                }, 500);
+            });
+        }, 5000);
+    });
+</script>
+<?php
+$page_content = ob_get_clean();
+require_once __DIR__ . '/includes/layout.php';
+?>
