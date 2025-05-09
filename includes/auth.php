@@ -1,8 +1,7 @@
 <?php
 // FlexAutoPro - includes/auth.php
-// التحقق من تسجيل الدخول وتحديد نوع المستخدم + دعم صلاحيات مخصصة
+// إعداد الجلسة وتعريف دوال الدخول والصلاحيات فقط
 
-// تأكد من بدء الجلسة
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -17,17 +16,9 @@ function isAdmin() {
     return isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin';
 }
 
-// دالة: التحقق من صلاحيات مخصصة
+// دالة: هل لديه صلاحية معينة؟
 function hasPermission($permission) {
-    if (isAdmin()) {
-        return true; // الأدمن يملك كل الصلاحيات
-    }
+    if (isAdmin()) return true;
 
-    // تحقق من وجود قائمة صلاحيات مخصصة للمستخدم
-    if (!isset($_SESSION['permissions']) || !is_array($_SESSION['permissions'])) {
-        return false;
-    }
-
-    return in_array($permission, $_SESSION['permissions']);
+    return isset($_SESSION['permissions']) && is_array($_SESSION['permissions']) && in_array($permission, $_SESSION['permissions']);
 }
-?>
