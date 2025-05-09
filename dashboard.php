@@ -1,57 +1,81 @@
 <?php
-// 1) بدء الجلسة والتأكد من تسجيل الدخول
+// بدء الجلسة والتأكد من تسجيل الدخول
 require_once __DIR__ . '/includes/auth.php';
-
-// 2) تضمين الاتصال بقاعدة البيانات
 require_once __DIR__ . '/includes/db.php';
-
-// 3) تضمين الدوال المساعدة
 require_once __DIR__ . '/includes/functions.php';
-
-// 4) تضمين الهيدر العام (يحتوي <head> وفتح <body>)
 require_once __DIR__ . '/includes/header.php';
+
+$user_role = $_SESSION['user_role'] ?? 'user';
+$username = htmlspecialchars($_SESSION['username'], ENT_QUOTES);
 ?>
 
 <main class="container">
-    <h2>مرحبًا، <?= htmlspecialchars($_SESSION['username'], ENT_QUOTES) ?> 👋</h2>
-    <p>أهلاً بك في لوحة التحكم الخاصة بك على منصة <strong>FlexAuto</strong>.</p>
+    <div class="welcome-message">
+        <h2>مرحبًا، <?= $username ?> 👋</h2>
+        <p>أهلاً بك في لوحة التحكم الخاصة بك على منصة <strong>FlexAuto</strong>.</p>
+    </div>
 
     <div class="dashboard-links">
         <ul>
-            <li><a href="request_code.php">🔐 طلب كود برمجي</a></li>
-            <li><a href="airbag_reset.php">💥 مسح بيانات الحوادث</a></li>
-            <li><a href="ecu_tuning.php">⚙️ تعديل برمجة ECU</a></li>
-            <li><a href="notifications.php">🔔 عرض الإشعارات</a></li>
-            <li><a href="messages.php">📩 الرسائل</a></li>
-            <li><a href="profile.php">👤 إدارة الملف الشخصي</a></li>
+            <?php if ($user_role === 'admin' || $user_role === 'staff'): ?>
+                <li><a href="dashboard.php">📋 إدارة وتنفيذ الطلبات</a></li>
+                <li><a href="manage_users.php">👥 إدارة المستخدمين</a></li>
+                <li><a href="notifications.php">🔔 الإشعارات</a></li>
+                <li><a href="messages.php">📩 الرسائل</a></li>
+                <li><a href="profile.php">⚙️ الملف الشخصي</a></li>
+                <?php if ($user_role === 'admin'): ?>
+                    <li><a href="admin_employees.php">👨‍💼 إدارة الموظفين</a></li>
+                    <li><a href="system_logs.php">📜 سجلات النظام</a></li>
+                <?php endif; ?>
+            <?php else: ?>
+                <li><a href="request_code.php">🔐 طلب كود برمجي</a></li>
+                <li><a href="airbag_reset.php">💥 مسح بيانات الحوادث</a></li>
+                <li><a href="ecu_tuning.php">⚙️ تعديل برمجة ECU</a></li>
+                <li><a href="notifications.php">🔔 عرض الإشعارات</a></li>
+                <li><a href="messages.php">📩 الرسائل</a></li>
+                <li><a href="profile.php">👤 إدارة الملف الشخصي</a></li>
+            <?php endif; ?>
         </ul>
     </div>
 </main>
 
 <style>
-    /* تخصيص روابط لوحة التحكم */
+    .welcome-message {
+        text-align: center;
+        margin-bottom: 30px;
+        color: #ffffff;
+    }
+
     .dashboard-links ul {
         list-style: none;
-        margin: 20px 0;
         padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 15px;
     }
-    .dashboard-links ul li {
-        margin: 8px 0;
-    }
+
     .dashboard-links ul li a {
-        display: inline-block;
-        padding: 10px 18px;
+        padding: 12px 20px;
         background-color: #004080;
-        color: #fff;
+        color: #ffffff;
         text-decoration: none;
         border-radius: 6px;
         transition: background 0.2s;
+        display: inline-block;
     }
+
     .dashboard-links ul li a:hover {
         background-color: #0066cc;
+    }
+
+    @media (max-width: 768px) {
+        .dashboard-links ul {
+            flex-direction: column;
+            align-items: center;
+        }
     }
 </style>
 
 <?php
-// 5) تضمين الفوتر العام (يغلق </body></html>)
 require_once __DIR__ . '/includes/footer.php';
