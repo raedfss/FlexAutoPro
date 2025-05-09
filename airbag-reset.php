@@ -1,47 +1,36 @@
 <?php
 session_start();
 
-// 1) التحقق من المصادقة/تسجيل الدخول
-require_once __DIR__ . '/includes/auth.php';
+// 1) الاتصال بقاعدة البيانات (PDO)
+require_once __DIR__ . '/includes/db.php';
 
 // التحقق من تسجيل الدخول
-if (!isset($_SESSION['user_id'])) {
-    $_SESSION['message'] = "يجب تسجيل الدخول للوصول إلى هذه الصفحة";
-    $_SESSION['message_type'] = "error";
+if (!isset($_SESSION['email'])) {
     header("Location: login.php");
     exit;
 }
 
+$username = $_SESSION['username'];
+$user_type = $_SESSION['user_role'] ?? 'user';
+$email = $_SESSION['email'] ?? '';
+$user_id = $_SESSION['user_id'] ?? 0;
 
-// التحقق من مستوى صلاحيات المستخدم (إذا كان مطلوبًا)
-if (!hasPermission('airbag_reset')) {
-    // إعادة التوجيه إلى الصفحة الرئيسية مع رسالة خطأ
-    $_SESSION['message'] = "ليس لديك صلاحية للوصول لهذه الصفحة";
-    $_SESSION['message_type'] = "error";
-    header("Location: index.php");
-    exit;
-}
-
-// 2) الاتصال بقاعدة البيانات (PDO)
-require_once __DIR__ . '/includes/db.php';
-
-// 3) دوال مساعدة (showMessage, formatDate, ...)
+// استيراد الدوال المساعدة والأمان
 require_once __DIR__ . '/includes/functions.php';
-
-// 4) مكتبة التحقق من المدخلات والحماية
 require_once __DIR__ . '/includes/security.php';
 
 // إنشاء توكن CSRF لحماية النموذج
 $csrf_token = generateCSRFToken();
 
-// 4) الهيدر العام
-require_once __DIR__ . '/includes/header.php';
+// إعداد عنوان الصفحة
+$page_title = 'طلب مسح بيانات الحادث (Airbag Reset)';
+$display_title = 'طلب مسح بيانات الحادث (Airbag Reset)';
 
 // تهيئة رسائل التنفيذ
 $success = '';
-$error   = '';
+$error = '';
 
-// 5) معالجة إرسال النموذج
+// معالجة إرسال النموذج
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // التحقق من توكن CSRF
     if (!validateCSRFToken($_POST['csrf_token'] ?? '')) {
@@ -69,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             elseif ($file['size'] > 2 * 1024 * 1024) {
                 $error = "❌ حجم الملف كبير. الحد الأقصى المسموح هو 2 ميجابايت.";
             } 
-            // التحقق من نوع MIME الفعلي (يتطلب إضافة وظيفة للتحقق من الملفات الثنائية)
+            // التحقق من نوع MIME الفعلي
             elseif (!validateBinaryFile($file['tmp_name'], $ext)) {
                 $error = "❌ محتوى الملف غير صالح.";
             }
@@ -99,14 +88,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     VALUES (:uid, :ecu, :veh, :file, NOW())
                                 ");
                                 $stmt->execute([
-                                    ':uid'  => (int)$_SESSION['user_id'],
+                                    ':uid'  => (int)$user_id,
                                     ':ecu'  => $ecu_number,
                                     ':veh'  => $vehicle_type,
                                     ':file' => $filename
                                 ]);
 
                                 // سجل العملية في سجل الأحداث
-                                logActivity('airbag_reset', 'تم إرسال طلب مسح بيانات Airbag', $_SESSION['user_id']);
+                                logActivity('airbag_reset', 'تم إرسال طلب مسح بيانات Airbag', $user_id);
                                 
                                 $success = "✅ تم إرسال طلب مسح بيانات Airbag بنجاح.";
                                 
@@ -136,10 +125,110 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // تحديث توكن CSRF بعد المعالجة
 $csrf_token = generateCSRFToken();
-?>
 
+// CSS مخصص للصفحة
+$page_css = <<<CSS
+.container {
+  background: rgba(0, 0, 0, 0.7);
+  padding: 35px;
+  width: 90%;
+  max-width: 880px;
+  border-radius: 16px;
+  text-align: center;
+  margin: 30px auto;
+  box-shadow: 0 0 40px rgba(0, 200, 255, 0.15);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(66, 135, 245, 0.25);
+}
+.form {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: right;
+}
+.form-group {
+  margin-bottom: 20px;
+}
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #a8d8ff;
+}
+.form-group input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(66, 135, 245, 0.4);
+  background: rgba(0, 40, 80, 0.4);
+  color: white;
+  box-sizing: border-box;
+}
+.form-group input[type="file"] {
+  padding: 8px;
+  background: rgba(0, 40, 80, 0.4);
+}
+.form-text {
+  font-size: 0.8rem;
+  color: #aaa;
+  margin-top: 5px;
+}
+.btn {
+  padding: 12px 25px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+  margin-top: 10px;
+}
+.btn-primary {
+  background: linear-gradient(145deg, #1e90ff, #0070cc);
+  color: white;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+.btn-primary:hover {
+  background: linear-gradient(145deg, #2eaaff, #0088ff);
+  transform: translateY(-2px);
+}
+.alert {
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  position: relative;
+}
+.alert-danger {
+  background: rgba(220, 53, 69, 0.2);
+  border: 1px solid rgba(220, 53, 69, 0.5);
+  color: #ff6b6b;
+}
+.alert-success {
+  background: rgba(40, 167, 69, 0.2);
+  border: 1px solid rgba(40, 167, 69, 0.5);
+  color: #75ff75;
+}
+.alert-info {
+  background: rgba(23, 162, 184, 0.2);
+  border: 1px solid rgba(23, 162, 184, 0.5);
+  color: #5dccff;
+}
+.alert-dismissible .btn-close {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 15px;
+  color: inherit;
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+CSS;
+
+// تعريف محتوى الصفحة
+ob_start();
+?>
 <div class="container">
-    <h2>طلب مسح بيانات الحادث (Airbag Reset)</h2>
+    <h2><?= $display_title ?></h2>
 
     <?php
     // عرض رسائل الخطأ أو النجاح
@@ -181,73 +270,9 @@ $csrf_token = generateCSRFToken();
         <strong>ملاحظة:</strong> يرجى التأكد من صحة الملف المرفوع، حيث سيتم التعامل معه من قبل الفريق الفني.
     </div>
 </div>
-
 <?php
-// 6) الفوتر العام
-require_once __DIR__ . '/includes/footer.php';
+$page_content = ob_get_clean();
 
-/**
- * دالة للتحقق من صلاحية الملفات الثنائية
- * @param string $file_path مسار الملف المؤقت
- * @param string $ext امتداد الملف
- * @return bool
- */
-function validateBinaryFile($file_path, $ext) {
-    // التحقق من وجود الملف
-    if (!file_exists($file_path)) {
-        return false;
-    }
-    
-    // فحص أساسي للبيانات الثنائية
-    if ($ext === 'bin') {
-        // التحقق من أن الملف بصيغة ثنائية صالحة
-        $fileContent = file_get_contents($file_path);
-        if ($fileContent === false || strlen($fileContent) < 10) {
-            return false;
-        }
-        
-        // يمكن إضافة فحوصات إضافية للتأكد من صحة الملف
-        return true;
-    }
-    
-    if ($ext === 'hex') {
-        // فحص بسيط لصيغة ملف HEX
-        $content = file_get_contents($file_path);
-        if ($content === false) {
-            return false;
-        }
-        
-        // التحقق من أن الملف يحتوي على سطور HEX صالحة
-        $lines = explode("\n", $content);
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (empty($line)) continue;
-            
-            // نمط الخط في ملف HEX (عادة يبدأ بـ :)
-            if (!preg_match('/^:[0-9A-Fa-f]{8,}$/', $line)) {
-                return false;
-            }
-        }
-        
-        return true;
-    }
-    
-    return false;
-}
-
-/**
- * دالة لتأمين اسم الملف
- * @param string $filename اسم الملف
- * @return string اسم الملف المؤمن
- */
-function secureFileName($filename) {
-    // استبدال الأحرف غير الآمنة
-    $filename = preg_replace('/[^a-zA-Z0-9_.-]/', '', $filename);
-    
-    // منع الملفات التي تبدأ بنقطة
-    if (substr($filename, 0, 1) === '.') {
-        $filename = 'file_' . $filename;
-    }
-    
-    return $filename;
-}
+// إدراج القالب
+include __DIR__ . '/includes/layout.php';
+?>
