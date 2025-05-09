@@ -1,24 +1,26 @@
 <?php
 // FlexAutoPro - includes/auth.php
-// إعداد الجلسة وتعريف دوال الدخول والصلاحيات فقط
+// التحقق من تسجيل الدخول وتحديد نوع المستخدم
 
+// تأكد من بدء الجلسة
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// دالة: هل المستخدم مسجل دخول؟
-function isLoggedIn() {
-    return isset($_SESSION['user_id']);
+// التحقق من تسجيل الدخول
+if (!isset($_SESSION['user_id'])) {
+    // لم يتم تسجيل الدخول → إعادة التوجيه لصفحة تسجيل الدخول
+    header("Location: /login.php");
+    exit;
 }
 
-// دالة: هل المستخدم أدمن؟
+// التحقق من وجود الدور (user_role) إذا لزم الأمر
+if (!isset($_SESSION['user_role'])) {
+    // تعيين دور افتراضي في حال غيابه (اختياري)
+    $_SESSION['user_role'] = 'user';
+}
+
+// يمكن استخدام هذا الملف للتحقق من الصلاحيات أيضًا:
 function isAdmin() {
     return isset($_SESSION['user_role']) && $_SESSION['user_role'] === 'admin';
-}
-
-// دالة: هل لديه صلاحية معينة؟
-function hasPermission($permission) {
-    if (isAdmin()) return true;
-
-    return isset($_SESSION['permissions']) && is_array($_SESSION['permissions']) && in_array($permission, $_SESSION['permissions']);
 }
