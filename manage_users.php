@@ -15,6 +15,21 @@ $email = $_SESSION['email'];
 $page_title = 'إدارة المستخدمين';
 $display_title = 'إدارة المستخدمين';
 
+// وظيفة لتسجيل النشاط في سجل النظام
+function log_activity($pdo, $email, $action, $details = '', $ip = null) {
+    if ($ip === null) {
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    }
+    $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+    
+    try {
+        $stmt = $pdo->prepare("INSERT INTO system_logs (user_email, action, details, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)");
+        $stmt->execute([$email, $action, $details, $ip, $user_agent]);
+    } catch (PDOException $e) {
+        error_log("Error logging activity: " . $e->getMessage());
+    }
+}
+
 // معالجة النموذج لإضافة موظف جديد
 if (isset($_POST['add_staff'])) {
     $staff_name = $_POST['staff_name'] ?? '';
@@ -32,11 +47,24 @@ if (isset($_POST['add_staff'])) {
             
             // إضافة الموظف الجديد
             try {
-                $stmt = $pdo->prepare("INSERT INTO users (username, email, password, user_role, is_active) VALUES (?, ?, ?, 'staff', 1)");
+                $pdo->beginTransaction();
+                
+                $stmt = $pdo->prepare("INSERT INTO users (username, email, password, user_role, is_active) VALUES (?, ?, ?, 'staff', TRUE) RETURNING id");
                 $stmt->execute([$staff_name, $staff_email, $hashed_password]);
+                $new_user_id = $stmt->fetchColumn();
+                
+                // إنشاء ملف شخصي فارغ للموظف
+                $stmt = $pdo->prepare("INSERT INTO user_profiles (user_email) VALUES (?)");
+                $stmt->execute([$staff_email]);
+                
+                $pdo->commit();
+                
+                log_activity($pdo, $email, 'add_staff', "تمت إضافة موظف جديد: {$staff_email}");
                 $success_message = "تمت إضافة الموظف بنجاح";
             } catch (PDOException $e) {
+                $pdo->rollBack();
                 $error_message = "حدث خطأ أثناء إضافة الموظف: " . $e->getMessage();
+                error_log("Staff addition error: " . $e->getMessage());
             }
         } else {
             $error_message = "البريد الإلكتروني مستخدم بالفعل";
@@ -63,9 +91,12 @@ if (isset($_POST['change_password'])) {
             try {
                 $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
                 $stmt->execute([$hashed_password, $user_id]);
+                
+                log_activity($pdo, $email, 'change_password', "تم تغيير كلمة مرور المستخدم: {$user_email}");
                 $success_message = "تم تغيير كلمة المرور بنجاح";
             } catch (PDOException $e) {
                 $error_message = "حدث خطأ أثناء تغيير كلمة المرور: " . $e->getMessage();
+                error_log("Password change error: " . $e->getMessage());
             }
         } else {
             $error_message = "لا يمكنك تغيير كلمة مرور حسابك من هنا";
@@ -82,18 +113,32 @@ if (isset($_POST['toggle_status'])) {
     
     if (!empty($user_id)) {
         // التحقق من عدم تغيير حالة المدير الحالي
-        $stmt = $pdo->prepare("SELECT email FROM users WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT email, user_role FROM users WHERE id = ?");
         $stmt->execute([$user_id]);
-        $user_email = $stmt->fetchColumn();
+        $user = $stmt->fetch();
         
-        if ($user_email && $user_email !== $email) {
+        if ($user && $user['email'] !== $email) {
             // تحديث الحالة
             try {
                 $stmt = $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ?");
                 $stmt->execute([$new_status, $user_id]);
+                
+                $status_text = $new_status ? "تفعيل" : "تعطيل";
+                log_activity($pdo, $email, 'toggle_status', "{$status_text} حساب المستخدم: {$user['email']}");
                 $success_message = "تم تحديث حالة المستخدم بنجاح";
+                
+                // إذا كان مستخدم عادي، أرسل إشعار
+                if ($user['user_role'] === 'user') {
+                    $message = $new_status ? 
+                        "تم تفعيل حسابك. يمكنك الآن استخدام جميع ميزات النظام." :
+                        "تم تعطيل حسابك مؤقتاً. يرجى التواصل مع إدارة النظام للمزيد من المعلومات.";
+                    
+                    $stmt = $pdo->prepare("INSERT INTO notifications (user_email, message, is_read) VALUES (?, ?, 0)");
+                    $stmt->execute([$user['email'], $message]);
+                }
             } catch (PDOException $e) {
                 $error_message = "حدث خطأ أثناء تحديث حالة المستخدم: " . $e->getMessage();
+                error_log("Status update error: " . $e->getMessage());
             }
         } else {
             $error_message = "لا يمكنك تغيير حالة حسابك من هنا";
@@ -109,24 +154,55 @@ if (isset($_POST['delete_user'])) {
     
     if (!empty($user_id)) {
         // التحقق من عدم حذف المدير الحالي
-        $stmt = $pdo->prepare("SELECT email FROM users WHERE id = ?");
+        $stmt = $pdo->prepare("SELECT email, user_role FROM users WHERE id = ?");
         $stmt->execute([$user_id]);
-        $user_email = $stmt->fetchColumn();
+        $user = $stmt->fetch();
         
-        if ($user_email && $user_email !== $email) {
+        if ($user && $user['email'] !== $email) {
             // التحقق من عدم وجود نشاط للمستخدم
-            $stmt = $pdo->prepare("SELECT COUNT(*) FROM tickets WHERE user_email = ?");
-            $stmt->execute([$user_email]);
-            $has_activity = $stmt->fetchColumn() > 0;
+            $has_activity = false;
+            
+            try {
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM tickets WHERE user_email = ?");
+                $stmt->execute([$user['email']]);
+                $ticket_count = $stmt->fetchColumn();
+                
+                $stmt = $pdo->prepare("SELECT COUNT(*) FROM ticket_comments WHERE user_email = ?");
+                $stmt->execute([$user['email']]);
+                $comment_count = $stmt->fetchColumn();
+                
+                $has_activity = ($ticket_count > 0 || $comment_count > 0);
+                
+                // إذا كان من نوع staff، تحقق من وجود تذاكر مسندة إليه
+                if ($user['user_role'] === 'staff') {
+                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM tickets WHERE assigned_to = ?");
+                    $stmt->execute([$user['email']]);
+                    $assigned_tickets = $stmt->fetchColumn();
+                    
+                    $has_activity = $has_activity || ($assigned_tickets > 0);
+                }
+            } catch (PDOException $e) {
+                error_log("Activity check error: " . $e->getMessage());
+                $has_activity = true; // افتراض وجود نشاط في حالة الخطأ للأمان
+            }
             
             if (!$has_activity) {
-                // حذف المستخدم
+                // حذف المستخدم وكل البيانات المرتبطة به
                 try {
+                    $pdo->beginTransaction();
+                    
+                    // استخدام CASCADE في قاعدة البيانات للحذف التلقائي للبيانات المرتبطة
                     $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
                     $stmt->execute([$user_id]);
+                    
+                    $pdo->commit();
+                    
+                    log_activity($pdo, $email, 'delete_user', "تم حذف المستخدم: {$user['email']}");
                     $success_message = "تم حذف المستخدم بنجاح";
                 } catch (PDOException $e) {
+                    $pdo->rollBack();
                     $error_message = "حدث خطأ أثناء حذف المستخدم: " . $e->getMessage();
+                    error_log("User deletion error: " . $e->getMessage());
                 }
             } else {
                 $error_message = "لا يمكن حذف هذا المستخدم لأنه لديه نشاط في النظام";
@@ -147,20 +223,24 @@ if (isset($_POST['send_profile_notification'])) {
         // الحصول على بريد المستخدم
         $stmt = $pdo->prepare("SELECT email, username FROM users WHERE id = ?");
         $stmt->execute([$user_id]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        $user = $stmt->fetch();
         
         if ($user) {
             // إنشاء إشعار جديد
             try {
-                $notification_message = "يرجى استكمال ملفك الشخصي والوثائق المطلوبة.";
-                $stmt = $pdo->prepare("INSERT INTO notifications (user_email, message, is_read, created_at) VALUES (?, ?, 0, NOW())");
+                $notification_message = "يرجى استكمال ملفك الشخصي والوثائق المطلوبة للاستفادة من جميع ميزات النظام.";
+                $stmt = $pdo->prepare("INSERT INTO notifications (user_email, message, is_read) VALUES (?, ?, 0)");
                 $stmt->execute([$user['email'], $notification_message]);
                 
-                // يمكن إضافة إرسال بريد إلكتروني هنا إذا كان مطلوباً
-                
+                log_activity($pdo, $email, 'send_notification', "تم إرسال تنبيه استكمال الملف الشخصي إلى: {$user['email']}");
                 $success_message = "تم إرسال التنبيه بنجاح إلى " . $user['username'];
+                
+                // يمكن إضافة إرسال بريد إلكتروني هنا
+                // TODO: إضافة كود إرسال البريد الإلكتروني
+                
             } catch (PDOException $e) {
                 $error_message = "حدث خطأ أثناء إرسال التنبيه: " . $e->getMessage();
+                error_log("Notification error: " . $e->getMessage());
             }
         } else {
             $error_message = "المستخدم غير موجود";
@@ -172,50 +252,58 @@ if (isset($_POST['send_profile_notification'])) {
 
 // جلب قائمة الموظفين
 try {
-    $stmt = $pdo->prepare("SELECT id, username, email, is_active, created_at FROM users WHERE user_role = 'staff'");
+    $stmt = $pdo->prepare("SELECT id, username, email, is_active, created_at FROM users WHERE user_role = 'staff' ORDER BY created_at DESC");
     $stmt->execute();
-    $staff_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $staff_list = $stmt->fetchAll();
 } catch (PDOException $e) {
     $error_message = "حدث خطأ أثناء جلب قائمة الموظفين: " . $e->getMessage();
+    error_log("Staff list error: " . $e->getMessage());
     $staff_list = [];
 }
 
 // جلب قائمة المستخدمين (العملاء)
 try {
-    $stmt = $pdo->prepare("SELECT id, username, email, is_active, created_at FROM users WHERE user_role = 'user'");
+    $stmt = $pdo->prepare("SELECT id, username, email, is_active, created_at FROM users WHERE user_role = 'user' ORDER BY created_at DESC");
     $stmt->execute();
-    $users_list = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $users_list = $stmt->fetchAll();
     
     // إضافة معلومات إضافية لكل مستخدم
     foreach ($users_list as &$user) {
-        // حساب نسبة اكتمال الملف الشخصي - هذا مثال فقط، يجب تعديله حسب هيكل البيانات الفعلي
+        // حساب نسبة اكتمال الملف الشخصي
         try {
-            $stmt = $pdo->prepare("SELECT 
-                (CASE WHEN phone IS NOT NULL THEN 20 ELSE 0 END) +
-                (CASE WHEN address IS NOT NULL THEN 20 ELSE 0 END) +
-                (CASE WHEN city IS NOT NULL THEN 20 ELSE 0 END) +
-                (CASE WHEN has_documents = 1 THEN 40 ELSE 0 END) AS completion_percentage
-                FROM user_profiles WHERE user_email = ?");
+            // استعلام لمعرفة بيانات الملف الشخصي
+            $stmt = $pdo->prepare("SELECT * FROM user_profiles WHERE user_email = ?");
             $stmt->execute([$user['email']]);
-            $profile_data = $stmt->fetch(PDO::FETCH_ASSOC);
+            $profile = $stmt->fetch();
             
-            $user['profile_completion'] = $profile_data ? ($profile_data['completion_percentage'] ?? 0) : 0;
-            
-            // حالة الوثائق - مثال فقط
+            // استعلام لعد الوثائق المتحقق منها
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM user_documents WHERE user_email = ? AND status = 'verified'");
             $stmt->execute([$user['email']]);
             $verified_docs = $stmt->fetchColumn();
             
-            $user['docs_complete'] = $verified_docs >= 2; // افتراض أن هناك حاجة لمستندين على الأقل
+            // حساب النسبة المئوية للاكتمال
+            $completion_percentage = 0;
+            
+            if ($profile) {
+                // منح نقاط للبيانات المكتملة
+                $completion_percentage += !empty($profile['phone']) ? 20 : 0;
+                $completion_percentage += !empty($profile['address']) ? 20 : 0;
+                $completion_percentage += !empty($profile['city']) ? 20 : 0;
+                $completion_percentage += ($verified_docs >= 2) ? 40 : ($verified_docs * 20); // منح 20 نقطة لكل وثيقة متحقق منها، بحد أقصى 40
+            }
+            
+            $user['profile_completion'] = $completion_percentage;
+            $user['docs_complete'] = ($verified_docs >= 2); // يُعتبر المستندات مكتملة إذا كان هناك مستندين متحقق منهما على الأقل
             
         } catch (PDOException $e) {
-            error_log("Error getting user profile data: " . $e->getMessage());
+            error_log("User profile data error: " . $e->getMessage());
             $user['profile_completion'] = 0;
             $user['docs_complete'] = false;
         }
     }
 } catch (PDOException $e) {
     $error_message = "حدث خطأ أثناء جلب قائمة المستخدمين: " . $e->getMessage();
+    error_log("Users list error: " . $e->getMessage());
     $users_list = [];
 }
 
@@ -481,15 +569,15 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelector('.tab-button').click();
     
     // تنشيط الجداول للبحث والترتيب
-    if (typeof jQuery !== 'undefined' && typeof jQuery.fn.DataTable !== 'undefined') {
-        jQuery('#staff-table').DataTable({
+    if (typeof jQuery !== 'undefined' && typeof $.fn.DataTable !== 'undefined') {
+        $('#staff-table').DataTable({
             "language": {
                 "url": "//cdn.datatables.net/plug-ins/1.10.25/i18n/Arabic.json"
             },
             "order": [[3, "desc"]]
         });
         
-        jQuery('#users-table').DataTable({
+        $('#users-table').DataTable({
             "language": {
                 "url": "//cdn.datatables.net/plug-ins/1.10.25/i18n/Arabic.json"
             },
@@ -566,6 +654,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(function() {
             alerts.forEach(alert => {
                 alert.style.opacity = '0';
+                alert.style.transition = 'opacity 0.5s';
                 setTimeout(function() {
                     alert.style.display = 'none';
                 }, 500);
@@ -649,7 +738,7 @@ ob_start();
                             <td><?= $index + 1 ?></td>
                             <td><?= htmlspecialchars($staff['username']) ?></td>
                             <td><?= htmlspecialchars($staff['email']) ?></td>
-                            <td><?= htmlspecialchars($staff['created_at']) ?></td>
+                            <td><?= date('Y-m-d H:i', strtotime($staff['created_at'])) ?></td>
                             <td>
                                 <?php if ($staff['is_active']): ?>
                                     <span class="badge badge-success">مفعل</span>
@@ -722,7 +811,7 @@ ob_start();
                             <td><?= $index + 1 ?></td>
                             <td><?= htmlspecialchars($user['username']) ?></td>
                             <td><?= htmlspecialchars($user['email']) ?></td>
-                            <td><?= htmlspecialchars($user['created_at']) ?></td>
+                            <td><?= date('Y-m-d H:i', strtotime($user['created_at'])) ?></td>
                             <td>
                                 <div class="progress-bar-container">
                                     <div class="progress-bar" style="width: <?= $user['profile_completion'] ?>%;"></div>
