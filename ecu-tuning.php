@@ -24,13 +24,30 @@ if (empty($_SESSION['csrf_token'])) {
 $csrf_token = $_SESSION['csrf_token'];
 
 // تعريف user_type بشكل آمن لمنع التحذير
-$user_type = isset($_SESSION['user_type']) ? sanitize_input($_SESSION['user_type']) : '';
+$user_type = isset($_SESSION['user_role']) ? sanitize_input($_SESSION['user_role']) : '';
 
 // إعدادات الصفحة
 $page_title = "تعديل برمجيات ECU";
 $hide_title = true;
 $success_message = '';
 $error_messages = [];
+
+// التحقق من اكتمال الملف الشخصي (سنقوم بتنفيذ فحص بسيط)
+$profile_complete = false;
+if (isset($_SESSION['user_id'])) {
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+        $stmt->execute([$_SESSION['user_id']]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!empty($user['username']) && !empty($user['email'])) {
+            $profile_complete = true;
+        }
+    } catch (PDOException $e) {
+        // لا نفعل شيئًا، سنفترض أن الملف الشخصي غير مكتمل
+        error_log("ECU Tuning Profile Check Error: " . $e->getMessage());
+    }
+}
 
 // متغيرات للاحتفاظ بالمدخلات في حالة الخطأ
 $car_type = '';
@@ -73,80 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         // معالجة الملف إذا تم رفعه
         if (isset($_FILES['ecu_file']) && $_FILES['ecu_file']['error'] === UPLOAD_ERR_OK) {
-            // تشغيل التحقق عند تحميل الصفحة إذا كانت هناك قيمة
-            if (chassisInput.value.length > 0) {
-                chassisInput.dispatchEvent(new Event('input'));
-            }
-        }
-        
-        // منع إرسال النموذج مرتين
-        const form = document.getElementById('ecu-form');
-        const submitBtn = document.getElementById('submit-btn');
-        
-        if (form && submitBtn) {
-            form.addEventListener('submit', function() {
-                // التحقق من صحة رقم الشاصي قبل الإرسال
-                const chassisValue = chassisInput.value.trim();
-                if (chassisValue.length !== 17) {
-                    vinValidation.textContent = '✗ رقم الشاصي يجب أن يتكون من 17 خانة بالضبط';
-                    vinValidation.className = 'vin-validation vin-invalid';
-                    chassisInput.focus();
-                    return false;
-                }
-                
-                // تعطيل زر الإرسال بعد النقر
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإرسال...';
-            });
-        }
-        
-        // إخفاء رسائل التنبيه تلقائياً بعد 8 ثوانٍ
-        const alerts = document.querySelectorAll('.alert');
-        if (alerts.length) {
-            setTimeout(() => {
-                alerts.forEach(alert => {
-                    alert.style.opacity = '0';
-                    alert.style.transition = 'opacity 0.5s';
-                    setTimeout(() => {
-                        alert.style.display = 'none';
-                    }, 500);
-                });
-            }, 8000);
-        }
-        
-        // التحقق من حجم الملف قبل الإرسال
-        const fileInput = document.getElementById('ecu_file');
-        if (fileInput) {
-            fileInput.addEventListener('change', function() {
-                if (this.files.length > 0) {
-                    const fileSize = this.files[0].size; // بالبايت
-                    const maxSize = 10 * 1024 * 1024; // 10 ميجابايت
-                    
-                    if (fileSize > maxSize) {
-                        alert('حجم الملف كبير جدًا. الحد الأقصى هو 10 ميجابايت.');
-                        this.value = ''; // مسح الملف المحدد
-                    }
-                    
-                    // التحقق من امتداد الملف
-                    const fileName = this.files[0].name;
-                    const fileExt = fileName.split('.').pop().toLowerCase();
-                    const allowedExts = ['bin', 'hex', 'zip', 'rar', 'pdf'];
-                    
-                    if (!allowedExts.includes(fileExt)) {
-                        alert('نوع الملف غير مسموح به. الأنواع المسموحة: ' + allowedExts.join(', '));
-                        this.value = ''; // مسح الملف المحدد
-                    }
-                }
-            });
-        }
-    });
-</script>
-
-<?php
-// تخزين المحتوى وعرضه في قالب layout.php
-$page_content = ob_get_clean();
-include __DIR__ . '/includes/layout.php';
-?> التحقق من نوع الملف
+            // التحقق من نوع الملف
             $allowed_extensions = ['bin', 'hex', 'zip', 'rar', 'pdf'];
             $file_extension = strtolower(pathinfo($_FILES['ecu_file']['name'], PATHINFO_EXTENSION));
             
@@ -516,6 +460,12 @@ $page_css = '
         color: #ff6b6b;
     }
     
+    .alert-warning {
+        background-color: rgba(255, 193, 7, 0.1);
+        border: 1px solid rgba(255, 193, 7, 0.3);
+        color: #ffc107;
+    }
+    
     .alert i {
         margin-left: 10px;
         font-size: 20px;
@@ -601,6 +551,14 @@ ob_start();
             </div>
         </div>
     <?php endif; ?>
+    
+    <!-- إضافة تنبيه عن أهمية اكتمال الملف الشخصي -->
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        <div>
+            <strong>ملاحظة هامة:</strong> يجب إكمال بيانات الملف الشخصي الخاص بك للحصول على الخدمة بشكل كامل. يرجى التأكد من <a href="profile.php" style="color: #ffc107; text-decoration: underline;">تحديث ملفك الشخصي</a> قبل المتابعة.
+        </div>
+    </div>
     
     <div class="ecu-info-box">
         <h3>مميزات خدمة تعديل ECU</h3>
@@ -690,6 +648,7 @@ ob_start();
         });
         
         // التحقق من صحة رقم الشاصي (VIN)
+        // التحقق من صحة رقم الشاصي (VIN)
         const chassisInput = document.getElementById('chassis');
         const vinValidation = document.getElementById('vin_validation');
         
@@ -722,4 +681,77 @@ ob_start();
                 }
             });
             
-            //
+            // تشغيل التحقق عند تحميل الصفحة إذا كانت هناك قيمة
+            if (chassisInput.value.length > 0) {
+                chassisInput.dispatchEvent(new Event('input'));
+            }
+        }
+        
+        // منع إرسال النموذج مرتين
+        const form = document.getElementById('ecu-form');
+        const submitBtn = document.getElementById('submit-btn');
+        
+        if (form && submitBtn) {
+            form.addEventListener('submit', function() {
+                // التحقق من صحة رقم الشاصي قبل الإرسال
+                const chassisValue = chassisInput.value.trim();
+                if (chassisValue.length !== 17) {
+                    vinValidation.textContent = '✗ رقم الشاصي يجب أن يتكون من 17 خانة بالضبط';
+                    vinValidation.className = 'vin-validation vin-invalid';
+                    chassisInput.focus();
+                    return false;
+                }
+                
+                // تعطيل زر الإرسال بعد النقر
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإرسال...';
+            });
+        }
+        
+        // إخفاء رسائل التنبيه تلقائياً بعد 8 ثوانٍ
+        const alerts = document.querySelectorAll('.alert');
+        if (alerts.length) {
+            setTimeout(() => {
+                alerts.forEach(alert => {
+                    alert.style.opacity = '0';
+                    alert.style.transition = 'opacity 0.5s';
+                    setTimeout(() => {
+                        alert.style.display = 'none';
+                    }, 500);
+                });
+            }, 8000);
+        }
+        
+        // التحقق من حجم الملف قبل الإرسال
+        const fileInput = document.getElementById('ecu_file');
+        if (fileInput) {
+            fileInput.addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    const fileSize = this.files[0].size; // بالبايت
+                    const maxSize = 10 * 1024 * 1024; // 10 ميجابايت
+                    
+                    if (fileSize > maxSize) {
+                        alert('حجم الملف كبير جدًا. الحد الأقصى هو 10 ميجابايت.');
+                        this.value = ''; // مسح الملف المحدد
+                    }
+                    
+                    // التحقق من امتداد الملف
+                    const fileName = this.files[0].name;
+                    const fileExt = fileName.split('.').pop().toLowerCase();
+                    const allowedExts = ['bin', 'hex', 'zip', 'rar', 'pdf'];
+                    
+                    if (!allowedExts.includes(fileExt)) {
+                        alert('نوع الملف غير مسموح به. الأنواع المسموحة: ' + allowedExts.join(', '));
+                        this.value = ''; // مسح الملف المحدد
+                    }
+                }
+            });
+        }
+    });
+</script>
+
+<?php
+// تخزين المحتوى وعرضه في قالب layout.php
+$page_content = ob_get_clean();
+include __DIR__ . '/includes/layout.php';
+?>
