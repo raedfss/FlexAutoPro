@@ -98,24 +98,26 @@ $where_conditions = [];
 $params = [];
 
 if (!empty($status_filter)) {
-    $where_conditions[] = "status = ?";
+    $where_conditions[] = "ar.status = ?";
     $params[] = $status_filter;
 }
 
 $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
 
 // عدد الطلبات
-$count_sql = "SELECT COUNT(*) FROM airbag_requests $where_clause";
+$count_sql = "SELECT COUNT(*) FROM airbag_requests ar $where_clause";
 $stmt = $pdo->prepare($count_sql);
 $stmt->execute($params);
 $total_requests = $stmt->fetchColumn();
 
-// جلب الطلبات
+// جلب الطلبات - تصحيح SQL Query
 $sql = "
-    SELECT ar.*, 
+    SELECT ar.id, ar.user_email, ar.username, ar.brand, ar.model, ar.ecu_number, 
+           ar.original_filename, ar.file_path, ar.file_size, ar.status, 
+           ar.is_manual, ar.notes, ar.created_at, ar.processed_at,
            ae.eeprom_type
     FROM airbag_requests ar
-    LEFT JOIN airbag_ecus ae ON ar.brand = ae.brand AND ar.model = ae.model AND ar.ecu_number = ae.ecu_number
+    LEFT JOIN airbag_ecus ae ON (ar.brand = ae.brand AND ar.model = ae.model AND ar.ecu_number = ae.ecu_number)
     $where_clause 
     ORDER BY ar.created_at DESC 
     LIMIT $per_page OFFSET $offset
@@ -572,7 +574,7 @@ ob_start();
                 ?>
               </span>
             </td>
-            <td><?= htmlspecialchars(substr($request['notes'], 0, 50)) ?><?= strlen($request['notes']) > 50 ? '...' : '' ?></td>
+            <td><?= htmlspecialchars(substr($request['notes'] ?? '', 0, 50)) ?><?= strlen($request['notes'] ?? '') > 50 ? '...' : '' ?></td>
             <td><?= round($request['file_size'] / 1024, 1) ?> KB</td>
             <td><?= htmlspecialchars($request['ecu_number']) ?></td>
             <td><?= htmlspecialchars($request['model']) ?></td>
