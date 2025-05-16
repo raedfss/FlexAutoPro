@@ -93,6 +93,12 @@ $page_css = <<<CSS
 .admin-highlight:hover {
   background: linear-gradient(145deg, #ff8c1a, #ff5e00) !important;
 }
+.admin-special {
+  background: linear-gradient(145deg, #ff4757, #c44569) !important;
+}
+.admin-special:hover {
+  background: linear-gradient(145deg, #ff6b7d, #ff4757) !important;
+}
 .notification-badge {
   position: absolute;
   top: -6px;
@@ -145,6 +151,7 @@ ob_start();
       <a href="admin_tickets.php" class="admin-highlight">🎫 إدارة التذاكر</a>
       <a href="admin_versions.php">🔖 إدارة الإصدارات</a>
       <a href="inventory_management.php">🏪 إدارة المستودع</a>
+      <a href="admin_upload_excel.php" class="admin-special">📋 رفع ملف Excel للإيرباق</a>
       <a href="logs.php">📁 سجلات النظام</a>
     <?php else: ?>
       <a href="key-code.php">🔑 كود المفتاح</a>
