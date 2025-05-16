@@ -486,7 +486,7 @@ ob_start();
     </div>
     <div class="stat-card">
       <?php
-      $with_images = $pdo->query("SELECT COUNT(DISTINCT CONCAT(ei.brand, '-', ei.model, '-', ei.ecu_number)) FROM ecu_images ei")->fetchColumn();
+      $with_images = $pdo->query("SELECT COUNT(DISTINCT ecu_id) FROM ecu_images")->fetchColumn();
       ?>
       <div class="stat-number"><?= $with_images ?></div>
       <div class="stat-label">لديها صور</div>
