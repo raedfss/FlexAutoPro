@@ -149,9 +149,12 @@ ob_start();
       <a href="dashboard.php">📊 لوحة التحكم</a>
       <a href="manage_users.php">👥 إدارة المستخدمين</a>
       <a href="admin_tickets.php" class="admin-highlight">🎫 إدارة التذاكر</a>
+      <a href="admin_airbag_requests.php" class="admin-special">💥 إدارة طلبات الإيرباق</a>
       <a href="admin_versions.php">🔖 إدارة الإصدارات</a>
       <a href="inventory_management.php">🏪 إدارة المستودع</a>
       <a href="admin_upload_excel.php" class="admin-special">📋 رفع ملف Excel للإيرباق</a>
+      <a href="admin_ecu_images.php" class="admin-highlight">🖼️ إدارة صور الكمبيوترات</a>
+      <a href="admin_airbag_ecus.php">🗃️ إدارة بيانات الإيرباق</a>
       <a href="logs.php">📁 سجلات النظام</a>
     <?php else: ?>
       <a href="key-code.php">🔑 كود المفتاح</a>
