@@ -129,8 +129,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['excel_file'])) {
         $errors = 0;
 
         $stmt = $pdo->prepare("
-            INSERT IGNORE INTO airbag_ecus (brand, model, ecu_number, eeprom_type) 
-            VALUES (?, ?, ?, ?)
+           INSERT INTO airbag_ecus (brand, model, ecu_number, eeprom_type) 
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT ON CONSTRAINT unique_combo DO NOTHING
         ");
 
         foreach ($data as $row) {
