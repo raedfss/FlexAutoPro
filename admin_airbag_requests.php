@@ -34,30 +34,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             ");
             $stmt->execute([$status, $notes, $request_id]);
             
-            // إرسال إشعار للعميل
+            // إرسال إشعار للعميل (إذا كان جدول notifications موجوداً)
             $request_details = $pdo->prepare("SELECT * FROM airbag_requests WHERE id = ?");
             $request_details->execute([$request_id]);
             $request = $request_details->fetch(PDO::FETCH_ASSOC);
             
             if ($request) {
-                $notification_stmt = $pdo->prepare("
-                    INSERT INTO notifications (user_email, title, message, type) 
-                    VALUES (?, ?, ?, ?)
-                ");
-                
-                $status_text = [
-                    'pending' => 'قيد الانتظار',
-                    'processing' => 'جاري المعالجة',
-                    'completed' => 'مكتمل',
-                    'failed' => 'فشل'
-                ];
-                
-                $notification_stmt->execute([
-                    $request['user_email'],
-                    'تحديث حالة طلب الإيرباق',
-                    "تم تحديث حالة طلبك رقم #{$request_id} إلى: {$status_text[$status]}",
-                    'airbag_update'
-                ]);
+                // التحقق من وجود جدول notifications قبل الإدراج
+                try {
+                    $notification_stmt = $pdo->prepare("
+                        INSERT INTO notifications (user_email, title, message, type) 
+                        VALUES (?, ?, ?, ?)
+                    ");
+                    
+                    $status_text = [
+                        'pending' => 'قيد الانتظار',
+                        'processing' => 'جاري المعالجة',
+                        'completed' => 'مكتمل',
+                        'failed' => 'فشل'
+                    ];
+                    
+                    $notification_stmt->execute([
+                        $request['user_email'],
+                        'تحديث حالة طلب الإيرباق',
+                        "تم تحديث حالة طلبك رقم #{$request_id} إلى: {$status_text[$status]}",
+                        'airbag_update'
+                    ]);
+                } catch (PDOException $e) {
+                    // تجاهل خطأ notifications إذا لم يكن الجدول موجوداً
+                    error_log("Notification error: " . $e->getMessage());
+                }
             }
             
             $message = 'تم تحديث حالة الطلب بنجاح';
@@ -98,24 +104,26 @@ $where_conditions = [];
 $params = [];
 
 if (!empty($status_filter)) {
-    $where_conditions[] = "status = ?";
+    $where_conditions[] = "ar.status = ?";  // مهم: إضافة ar. prefix
     $params[] = $status_filter;
 }
 
 $where_clause = !empty($where_conditions) ? 'WHERE ' . implode(' AND ', $where_conditions) : '';
 
 // عدد الطلبات
-$count_sql = "SELECT COUNT(*) FROM airbag_requests $where_clause";
+$count_sql = "SELECT COUNT(*) FROM airbag_requests ar $where_clause";
 $stmt = $pdo->prepare($count_sql);
 $stmt->execute($params);
 $total_requests = $stmt->fetchColumn();
 
-// جلب الطلبات
+// جلب الطلبات - مع تحسين الـ SQL
 $sql = "
-    SELECT ar.*, 
+    SELECT ar.id, ar.user_email, ar.username, ar.brand, ar.model, ar.ecu_number, 
+           ar.original_filename, ar.file_path, ar.file_size, ar.status, 
+           ar.is_manual, ar.notes, ar.created_at, ar.processed_at,
            ae.eeprom_type
     FROM airbag_requests ar
-    LEFT JOIN airbag_ecus ae ON ar.brand = ae.brand AND ar.model = ae.model AND ar.ecu_number = ae.ecu_number
+    LEFT JOIN airbag_ecus ae ON (ar.brand = ae.brand AND ar.model = ae.model AND ar.ecu_number = ae.ecu_number)
     $where_clause 
     ORDER BY ar.created_at DESC 
     LIMIT $per_page OFFSET $offset
@@ -208,11 +216,13 @@ $page_css = <<<CSS
   border-radius: 10px;
   overflow: hidden;
   margin: 20px 0;
+  overflow-x: auto;
 }
 
 .data-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 800px;
 }
 
 .data-table th,
@@ -227,6 +237,7 @@ $page_css = <<<CSS
   background: rgba(0, 0, 0, 0.3);
   color: #00d4ff;
   font-weight: bold;
+  white-space: nowrap;
 }
 
 .data-table td {
@@ -245,6 +256,7 @@ $page_css = <<<CSS
   text-align: center;
   display: inline-block;
   min-width: 80px;
+  white-space: nowrap;
 }
 
 .status-pending { background: #ffc107; color: #000; }
@@ -263,6 +275,7 @@ $page_css = <<<CSS
   display: inline-block;
   font-size: 12px;
   margin: 2px;
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -408,6 +421,7 @@ $page_css = <<<CSS
   justify-content: center;
   gap: 10px;
   margin: 20px 0;
+  flex-wrap: wrap;
 }
 
 .pagination a, .pagination span {
@@ -462,6 +476,27 @@ $page_css = <<<CSS
 .back-link:hover {
   background: linear-gradient(145deg, #7a8288, #6c757d);
   transform: translateY(-2px);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .container {
+    width: 98%;
+    padding: 20px;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  
+  .filter-bar {
+    justify-content: center;
+  }
+  
+  .btn {
+    font-size: 11px;
+    padding: 5px 8px;
+  }
 }
 CSS;
 
@@ -541,47 +576,55 @@ ob_start();
         </tr>
       </thead>
       <tbody>
-        <?php foreach ($requests as $request): ?>
+        <?php if (empty($requests)): ?>
           <tr>
-            <td>
-              <button class="btn btn-primary" onclick="openUpdateModal(<?= htmlspecialchars(json_encode($request)) ?>)">
-                ✏️ تحديث
-              </button>
-              <a href="<?= htmlspecialchars($request['file_path']) ?>" class="btn btn-download" download>
-                📥 تحميل
-              </a>
-              <form method="POST" style="display: inline;" 
-                    onsubmit="return confirm('هل أنت متأكد من حذف هذا الطلب؟')">
-                <input type="hidden" name="action" value="delete_request">
-                <input type="hidden" name="request_id" value="<?= $request['id'] ?>">
-                <button type="submit" class="btn btn-danger">
-                  🗑️ حذف
-                </button>
-              </form>
+            <td colspan="10" style="text-align: center; color: #a8d8ff; padding: 30px;">
+              لا توجد طلبات حالياً
             </td>
-            <td>
-              <span class="status-badge status-<?= $request['status'] ?>">
-                <?php
-                $status_text = [
-                    'pending' => 'قيد الانتظار',
-                    'processing' => 'جاري المعالجة',
-                    'completed' => 'مكتمل',
-                    'failed' => 'فشل'
-                ];
-                echo $status_text[$request['status']] ?? $request['status'];
-                ?>
-              </span>
-            </td>
-            <td><?= htmlspecialchars(substr($request['notes'], 0, 50)) ?><?= strlen($request['notes']) > 50 ? '...' : '' ?></td>
-            <td><?= round($request['file_size'] / 1024, 1) ?> KB</td>
-            <td><?= htmlspecialchars($request['ecu_number']) ?></td>
-            <td><?= htmlspecialchars($request['model']) ?></td>
-            <td><?= htmlspecialchars($request['brand']) ?></td>
-            <td><?= htmlspecialchars($request['username']) ?></td>
-            <td><?= date('Y/m/d H:i', strtotime($request['created_at'])) ?></td>
-            <td>#<?= $request['id'] ?></td>
           </tr>
-        <?php endforeach; ?>
+        <?php else: ?>
+          <?php foreach ($requests as $request): ?>
+            <tr>
+              <td>
+                <button class="btn btn-primary" onclick="openUpdateModal(<?= htmlspecialchars(json_encode($request)) ?>)">
+                  ✏️ تحديث
+                </button>
+                <a href="<?= htmlspecialchars($request['file_path']) ?>" class="btn btn-download" download>
+                  📥 تحميل
+                </a>
+                <form method="POST" style="display: inline;" 
+                      onsubmit="return confirm('هل أنت متأكد من حذف هذا الطلب؟')">
+                  <input type="hidden" name="action" value="delete_request">
+                  <input type="hidden" name="request_id" value="<?= $request['id'] ?>">
+                  <button type="submit" class="btn btn-danger">
+                    🗑️ حذف
+                  </button>
+                </form>
+              </td>
+              <td>
+                <span class="status-badge status-<?= $request['status'] ?>">
+                  <?php
+                  $status_text = [
+                      'pending' => 'قيد الانتظار',
+                      'processing' => 'جاري المعالجة',
+                      'completed' => 'مكتمل',
+                      'failed' => 'فشل'
+                  ];
+                  echo $status_text[$request['status']] ?? $request['status'];
+                  ?>
+                </span>
+              </td>
+              <td><?= htmlspecialchars(substr($request['notes'] ?? '', 0, 50)) ?><?= strlen($request['notes'] ?? '') > 50 ? '...' : '' ?></td>
+              <td><?= round($request['file_size'] / 1024, 1) ?> KB</td>
+              <td><?= htmlspecialchars($request['ecu_number']) ?></td>
+              <td><?= htmlspecialchars($request['model']) ?></td>
+              <td><?= htmlspecialchars($request['brand']) ?></td>
+              <td><?= htmlspecialchars($request['username']) ?></td>
+              <td><?= date('Y/m/d H:i', strtotime($request['created_at'])) ?></td>
+              <td>#<?= $request['id'] ?></td>
+            </tr>
+          <?php endforeach; ?>
+        <?php endif; ?>
       </tbody>
     </table>
   </div>
