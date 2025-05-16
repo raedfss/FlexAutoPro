@@ -1,7 +1,7 @@
 <?php
-session_start();
-require_once __DIR__ . '/includes/SimpleXLSX.php';
 use Shuchkin\SimpleXLSX;
+session_start();
+require_once __DIR__ . '/includes/db.php';
 
 // التحقق من تسجيل الدخول والصلاحيات
 if (!isset($_SESSION['email']) || $_SESSION['user_role'] !== 'admin') {
