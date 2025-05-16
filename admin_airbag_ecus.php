@@ -122,10 +122,11 @@ $total_records = $stmt->fetchColumn();
 // جلب البيانات
 $sql = "
     SELECT ae.*, 
-           (SELECT COUNT(*) FROM ecu_images ei WHERE ei.brand = ae.brand AND ei.model = ae.model AND ei.ecu_number = ae.ecu_number) as has_images
+           (SELECT COUNT(*) FROM ecu_images ei WHERE ei.ecu_id = ae.id) as has_images
+
     FROM airbag_ecus ae 
     $where_clause 
-    ORDER BY ae.brand, ae.model, ae.ecu_number 
+    ORDER BY ae.brand, ae.model, ae.ecu_number
     LIMIT $per_page OFFSET $offset
 ";
 $stmt = $pdo->prepare($sql);
