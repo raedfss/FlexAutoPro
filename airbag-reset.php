@@ -30,7 +30,29 @@ $display_title = 'طلب مسح بيانات الحادث (Airbag Reset)';
 $success = '';
 $error = '';
 
+// دالة عرض الرسائل - إضافة لمنع خطأ Undefined variable
+if (!function_exists('showMessage')) {
+    function showMessage($type, $text) {
+        echo '<div class="alert alert-' . $type . '">' . $text . '</div>';
+    }
+}
+
 // معالجة إرسال النموذج
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // التحقق من توكن CSRF
+    if (!validateCSRFToken($_POST['csrf_token'] ?? '')) {
+        $error = "❌ فشل التحقق من الأمان. يرجى تحديث الصفحة والمحاولة مرة أخرى.";
+    } else {
+        // جلب القيم مع تنظيفها - تحديث الحقول حسب النظام الجديد
+        $brand = isset($_POST['brand']) ? sanitizeInput($_POST['brand']) : '';
+        $model = isset($_POST['model']) ? sanitizeInput($_POST['model']) : '';
+        $year = isset($_POST['year']) ? sanitizeInput($_POST['year']) : '';
+        $ecu_number = isset($_POST['ecu_number']) ? sanitizeInput($_POST['ecu_number']) : '';
+        $ecu_version = isset($_POST['ecu_version']) ? sanitizeInput($_POST['ecu_version']) : '';
+        $eeprom_type = isset($_POST['eeprom_type']) ? sanitizeInput($_POST['eeprom_type']) : '';
+        $file = isset($_FILES['eeprom_file']) ? $_FILES['eeprom_file'] : null;
+
+        // التحقق من اكتمال الحقول المطلوبة
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // التحقق من توكن CSRF
     if (!validateCSRFToken($_POST['csrf_token'] ?? '')) {
@@ -539,6 +561,7 @@ let searchHistory = {};
 let validatedFields = new Set();
 
 // تحسين تجربة المستخدم بتنفيذ الأحداث بعد تحميل الصفحة
+// تحسين تجربة المستخدم بتنفيذ الأحداث بعد تحميل الصفحة
 document.addEventListener('DOMContentLoaded', function() {
     // إضافة الأيقونات لحقول الإدخال
     addInputIcons();
@@ -557,7 +580,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // تحميل مكتبة FontAwesome إذا لم تكن موجودة
     if (!document.querySelector('link[href*="font-awesome"]')) {
-        const fontAwesome = document.createElement('link');
+        var fontAwesome = document.createElement('link');
         fontAwesome.rel = 'stylesheet';
         fontAwesome.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css';
         document.head.appendChild(fontAwesome);
@@ -567,10 +590,109 @@ document.addEventListener('DOMContentLoaded', function() {
     addScrollEffects();
 });
 
-// دالة إضافة أيقونات إلى حقول الإدخال
+// دالة لإضافة أيقونات إلى حقول الإدخال
 function addInputIcons() {
-    const iconMap = {
+    var iconMap = {
         'brandInput': '<i class="fas fa-car"></i>',
+        'modelInput': '<i class="fas fa-car-side"></i>',
+        'yearInput': '<i class="fas fa-calendar-alt"></i>',
+        'ecuNumberInput': '<i class="fas fa-microchip"></i>',
+        'ecuVersionInput': '<i class="fas fa-code-branch"></i>',
+        'eepromTypeInput': '<i class="fas fa-memory"></i>'
+    };
+    
+    for (var id in iconMap) {
+        if (iconMap.hasOwnProperty(id)) {
+            var inputElement = document.getElementById(id);
+            if (inputElement && inputElement.parentElement) {
+                var inputGroup = inputElement.parentElement;
+                var iconElement = document.createElement('span');
+                iconElement.className = 'input-icon';
+                iconElement.innerHTML = iconMap[id];
+                inputGroup.appendChild(iconElement);
+            }
+        }
+    }
+}
+
+// دالة لتهيئة معالجة ملف الرفع
+function initFileUploadHandler() {
+    var fileInput = document.getElementById('eeprom_file');
+    var fileNameDisplay = document.querySelector('.file-name-display');
+    var progressContainer = document.querySelector('.progress-container');
+    var progressBar = document.querySelector('.progress-bar');
+    
+    if (fileInput && fileNameDisplay) {
+        fileInput.addEventListener('change', function(e) {
+            if (this.files.length > 0) {
+                var fileName = this.files[0].name;
+                var fileSize = (this.files[0].size / 1024 / 1024).toFixed(2);
+                
+                fileNameDisplay.textContent = fileName + ' (' + fileSize + ' MB)';
+                fileNameDisplay.style.display = 'block';
+                
+                // للتوضيح فقط - محاكاة تقدم التحميل
+                if (progressContainer && progressBar) {
+                    progressContainer.style.display = 'block';
+                    var width = 0;
+                    var interval = setInterval(function() {
+                        if (width >= 100) {
+                            clearInterval(interval);
+                            setTimeout(function() {
+                                progressContainer.style.display = 'none';
+                            }, 500);
+                        } else {
+                            width += 5;
+                            progressBar.style.width = width + '%';
+                        }
+                    }, 50);
+                }
+                
+                // التحقق من الامتداد
+                var extension = fileName.split('.').pop().toLowerCase();
+                if (['bin', 'hex'].indexOf(extension) === -1) {
+                    showTooltip(fileInput, 'يجب أن يكون الملف بصيغة .bin أو .hex فقط');
+                }
+            }
+        });
+    }
+}
+
+// دالة إظهار رسائل الخطأ أو النجاح بطريقة متحركة
+function animateMessages() {
+    var alerts = document.querySelectorAll('.alert');
+    for (var i = 0; i < alerts.length; i++) {
+        var alert = alerts[i];
+        // تطبيق تأثير ظهور تدريجي
+        alert.style.opacity = '0';
+        alert.style.transform = 'translateY(-20px)';
+        alert.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        
+        (function(alertElement) {
+            setTimeout(function() {
+                alertElement.style.opacity = '1';
+                alertElement.style.transform = 'translateY(0)';
+            }, 100);
+        })(alert);
+        
+        // إضافة زر إغلاق إذا لم يكن موجوداً
+        if (!alert.querySelector('.btn-close')) {
+            var closeBtn = document.createElement('button');
+            closeBtn.className = 'btn-close';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.onclick = function() {
+                var currentAlert = this.parentElement;
+                currentAlert.style.opacity = '0';
+                currentAlert.style.transform = 'translateY(-20px)';
+                setTimeout(function() {
+                    currentAlert.remove();
+                }, 500);
+            };
+            alert.appendChild(closeBtn);
+            alert.classList.add('alert-dismissible');
+        }
+    }
+}</i>',
         'modelInput': '<i class="fas fa-car-side"></i>',
         'yearInput': '<i class="fas fa-calendar-alt"></i>',
         'ecuNumberInput': '<i class="fas fa-microchip"></i>',
@@ -707,7 +829,12 @@ function performSmartSearch(field, query, action) {
     searchTimeouts[field] = setTimeout(() => {
         showLoading(field);
         
-        fetch(`search_airbag_ecus.php?action=\${action}&q=` + encodeURIComponent(query))
+        // استخدام الترميز اليدوي بدلاً من encodeURIComponent
+        const encodedQuery = encodeQueryParam(query);
+        
+        const url = 'search_airbag_ecus.php?action=' + action + '&q=' + encodedQuery;
+        
+        fetch(url)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('فشل في الاتصال بالخادم');
@@ -728,10 +855,18 @@ function performSmartSearch(field, query, action) {
     }, 300); // تأخير 300ms
 }
 
+// دالة مساعدة لترميز معلمات URL بأمان
+function encodeQueryParam(str) {
+    if (!str) return '';
+    return str.replace(/[^\w\s]/gi, function(c) {
+        return '%' + c.charCodeAt(0).toString(16).padStart(2, '0');
+    }).replace(/ /g, '+');
+}
+
 // دالة عرض الاقتراحات المحسنة
 function displaySuggestions(field, suggestions) {
-    const container = document.getElementById(field + 'Suggestions');
-    const input = document.getElementById(field + 'Input');
+    var container = document.getElementById(field + 'Suggestions');
+    var input = document.getElementById(field + 'Input');
     
     if (!container || !input) return;
     
@@ -745,35 +880,42 @@ function displaySuggestions(field, suggestions) {
         return;
     }
     
-    suggestions.forEach((item, index) => {
-        const div = document.createElement('div');
+    for (var i = 0; i < suggestions.length; i++) {
+        var item = suggestions[i];
+        var div = document.createElement('div');
         div.className = 'suggestion-item';
         
         // تمييز الجزء المطابق من النص
-        const query = input.value.toLowerCase();
-        const itemText = item.toString();
-        const lowerItemText = itemText.toLowerCase();
+        var query = input.value.toLowerCase();
+        var itemText = item.toString();
+        var lowerItemText = itemText.toLowerCase();
         
         if (lowerItemText.includes(query)) {
-            const startIndex = lowerItemText.indexOf(query);
-            const endIndex = startIndex + query.length;
+            var startIndex = lowerItemText.indexOf(query);
+            var endIndex = startIndex + query.length;
             
-            const beforeMatch = itemText.substring(0, startIndex);
-            const match = itemText.substring(startIndex, endIndex);
-            const afterMatch = itemText.substring(endIndex);
+            var beforeMatch = itemText.substring(0, startIndex);
+            var match = itemText.substring(startIndex, endIndex);
+            var afterMatch = itemText.substring(endIndex);
             
             div.innerHTML = beforeMatch + '<strong style="color:#00d4ff">' + match + '</strong>' + afterMatch;
         } else {
             div.textContent = itemText;
         }
         
-        div.onclick = () => selectSuggestion(field, item);
-        div.addEventListener('mouseenter', () => {
-            currentFocus = index;
-            updateActiveSuggestion(field);
-        });
+        // يجب استخدام IIFE للحفاظ على قيمة المتغير في وظيفة الاستدعاء
+        (function(index, itemValue) {
+            div.onclick = function() {
+                selectSuggestion(field, itemValue);
+            };
+            div.addEventListener('mouseenter', function() {
+                currentFocus = index;
+                updateActiveSuggestion(field);
+            });
+        })(i, item);
+        
         container.appendChild(div);
-    });
+    }
     
     container.style.display = 'block';
     input.classList.add('with-suggestions');
@@ -783,6 +925,12 @@ function displaySuggestions(field, suggestions) {
     container.style.opacity = '0';
     container.style.transform = 'translateY(-10px)';
     container.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+    
+    setTimeout(function() {
+        container.style.opacity = '1';
+        container.style.transform = 'translateY(0)';
+    }, 10);
+}
     
     setTimeout(() => {
         container.style.opacity = '1';
@@ -872,12 +1020,11 @@ function hideSuggestions(field) {
 function showLoading(field) {
     const container = document.getElementById(field + 'Suggestions');
     if (container) {
-        container.innerHTML = `
-            <div class="loading-indicator">
-                <div class="loading-spinner"></div>
-                <span class="searching-effect">جاري البحث...</span>
-            </div>
-        `;
+        container.innerHTML = 
+            '<div class="loading-indicator">' +
+            '<div class="loading-spinner"></div>' +
+            '<span class="searching-effect">جاري البحث...</span>' +
+            '</div>';
         container.style.display = 'block';
         
         const input = document.getElementById(field + 'Input');
@@ -890,7 +1037,7 @@ function showLoading(field) {
         container.style.transform = 'translateY(-10px)';
         container.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
         
-        setTimeout(() => {
+        setTimeout(function() {
             container.style.opacity = '1';
             container.style.transform = 'translateY(0)';
         }, 10);
@@ -1149,6 +1296,24 @@ function searchEEPROMs(query) {
         return;
     }
     
+    const encodedBrand = encodeQueryParam(brand);
+    const encodedModel = encodeQueryParam(model);
+    
+    let searchUrl = 'eeproms&brand=' + encodedBrand + '&model=' + encodedModel;
+    
+    if (ecu) {
+        const encodedEcu = encodeQueryParam(ecu);
+        searchUrl += '&ecu=' + encodedEcu;
+    }
+    
+    performSmartSearch('eepromType', query, searchUrl);
+}
+    
+    if (!brand || !model) {
+        showError('eepromType', 'يرجى اختيار الماركة والموديل أولاً');
+        return;
+    }
+    
     let searchUrl = `eeproms&brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}`;
     if (ecu) {
         searchUrl += `&ecu=${encodeURIComponent(ecu)}`;
@@ -1251,6 +1416,50 @@ document.addEventListener('click', function(event) {
 window.addEventListener('beforeunload', function() {
     Object.values(searchTimeouts).forEach(timeout => clearTimeout(timeout));
 });
+
+// دالة عرض رسائل النظام
+function showSystemMessage(message, type) {
+    const container = document.createElement('div');
+    container.className = `alert alert-${type}`;
+    container.innerHTML = message;
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'btn-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.onclick = function() {
+        container.style.opacity = '0';
+        container.style.transform = 'translateY(-20px)';
+        setTimeout(() => {
+            container.remove();
+        }, 500);
+    };
+    
+    container.appendChild(closeBtn);
+    
+    const form = document.querySelector('.form');
+    if (form) {
+        form.parentNode.insertBefore(container, form);
+    }
+    
+    // تأثير ظهور تدريجي
+    container.style.opacity = '0';
+    container.style.transform = 'translateY(-20px)';
+    container.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    
+    setTimeout(() => {
+        container.style.opacity = '1';
+        container.style.transform = 'translateY(0)';
+    }, 100);
+    
+    // إخفاء تلقائي بعد فترة
+    setTimeout(() => {
+        container.style.opacity = '0';
+        container.style.transform = 'translateY(-20px)';
+        setTimeout(() => {
+            container.remove();
+        }, 500);
+    }, 10000);
+}
 
 // دالة لعرض تلميح المساعدة
 function showHelp(field) {
@@ -1434,8 +1643,12 @@ ob_start();
 
     <?php
     // عرض رسائل الخطأ أو النجاح
-    if ($error)   showMessage('danger', $error);
-    if ($success) showMessage('success', $success);
+    if (!empty($error)) {
+        showMessage('danger', $error);
+    }
+    if (!empty($success)) {
+        showMessage('success', $success);
+    }
     ?>
 
     <form method="POST" enctype="multipart/form-data" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>" class="form" onsubmit="return validateForm()">
