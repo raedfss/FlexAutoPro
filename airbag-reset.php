@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                 // سجل العملية في سجل الأحداث
                                 logActivity('airbag_reset', 'تم إرسال طلب مسح بيانات Airbag', $user_id);
                                 
-                                $success = "✅ تم إرسال طلب مسح بيانات Airbag بنجاح.";
+                                $success = "✅ تم إرسال طلب مسح بيانات Airbag بنجاح. سيتم مراجعته قريباً.";
                                 
                                 // إعادة تعيين المتغيرات لمنع إعادة الإرسال
                                 $brand = '';
@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // تحديث توكن CSRF بعد المعالجة
 $csrf_token = generateCSRFToken();
 
-// CSS مخصص للصفحة مع إضافة تنسيقات البحث الذكي
+// CSS مخصص للصفحة مع إضافة تنسيقات محسنة للبحث الذكي
 $page_css = <<<CSS
 .container {
   background: rgba(0, 0, 0, 0.7);
@@ -152,39 +152,53 @@ $page_css = <<<CSS
   backdrop-filter: blur(12px);
   border: 1px solid rgba(66, 135, 245, 0.25);
 }
+
 .form {
   max-width: 600px;
   margin: 0 auto;
   text-align: right;
 }
+
 .form-group {
   margin-bottom: 20px;
   position: relative;
 }
+
 .form-group label {
   display: block;
   margin-bottom: 8px;
   font-weight: bold;
   color: #a8d8ff;
 }
+
 .form-group input {
   width: 100%;
-  padding: 12px;
+  padding: 12px 40px 12px 12px;
   border-radius: 8px;
   border: 1px solid rgba(66, 135, 245, 0.4);
   background: rgba(0, 40, 80, 0.4);
   color: white;
   box-sizing: border-box;
+  transition: all 0.3s ease;
 }
+
+.form-group input:focus {
+  border-color: #00d4ff;
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+  outline: none;
+}
+
 .form-group input[type="file"] {
-  padding: 8px;
+  padding: 10px;
   background: rgba(0, 40, 80, 0.4);
 }
+
 .form-text {
   font-size: 0.8rem;
   color: #aaa;
   margin-top: 5px;
 }
+
 .btn {
   padding: 12px 25px;
   border: none;
@@ -193,37 +207,59 @@ $page_css = <<<CSS
   font-weight: bold;
   transition: 0.3s;
   margin-top: 10px;
+  text-decoration: none;
+  display: inline-block;
 }
+
 .btn-primary {
   background: linear-gradient(145deg, #1e90ff, #0070cc);
   color: white;
   box-shadow: 0 4px 10px rgba(0,0,0,0.3);
 }
+
 .btn-primary:hover {
   background: linear-gradient(145deg, #2eaaff, #0088ff);
   transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.4);
 }
+
+.btn-secondary {
+  background: linear-gradient(145deg, #6c757d, #5a6268);
+  color: white;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.btn-secondary:hover {
+  background: linear-gradient(145deg, #7a8288, #6c757d);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+}
+
 .alert {
   padding: 15px;
   border-radius: 8px;
   margin-bottom: 20px;
   position: relative;
 }
+
 .alert-danger {
   background: rgba(220, 53, 69, 0.2);
   border: 1px solid rgba(220, 53, 69, 0.5);
   color: #ff6b6b;
 }
+
 .alert-success {
   background: rgba(40, 167, 69, 0.2);
   border: 1px solid rgba(40, 167, 69, 0.5);
   color: #75ff75;
 }
+
 .alert-info {
   background: rgba(23, 162, 184, 0.2);
   border: 1px solid rgba(23, 162, 184, 0.5);
   color: #5dccff;
 }
+
 .alert-dismissible .btn-close {
   position: absolute;
   top: 0;
@@ -236,33 +272,36 @@ $page_css = <<<CSS
   cursor: pointer;
 }
 
-/* تنسيقات البحث الذكي (Autocomplete) */
+/* تنسيقات محسنة للبحث الذكي */
 .suggestions-container {
   position: absolute;
   top: 100%;
   left: 0;
   right: 0;
-  background: rgba(0, 40, 80, 0.95);
+  background: rgba(0, 20, 40, 0.95);
   border: 1px solid rgba(66, 135, 245, 0.4);
   border-top: none;
-  border-radius: 0 0 8px 8px;
-  max-height: 200px;
+  border-radius: 0 0 12px 12px;
+  max-height: 250px;
   overflow-y: auto;
   z-index: 1000;
   display: none;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(5px);
 }
 
 .suggestion-item {
-  padding: 10px 12px;
+  padding: 12px 15px;
   cursor: pointer;
   color: #fff;
   text-align: right;
   border-bottom: 1px solid rgba(66, 135, 245, 0.2);
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
 }
 
 .suggestion-item:hover {
-  background: rgba(30, 144, 255, 0.2);
+  background: rgba(30, 144, 255, 0.3);
+  padding-right: 20px;
 }
 
 .suggestion-item:last-child {
@@ -270,53 +309,378 @@ $page_css = <<<CSS
 }
 
 .suggestion-item.active {
-  background: rgba(30, 144, 255, 0.3);
+  background: rgba(30, 144, 255, 0.4);
+  padding-right: 20px;
 }
 
 .no-suggestions {
-  padding: 10px 12px;
+  padding: 15px;
   color: #aaa;
   text-align: center;
   font-style: italic;
 }
 
 .loading-indicator {
-  padding: 10px 12px;
+  padding: 15px;
   color: #a8d8ff;
   text-align: center;
-  font-style: italic;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
-/* تحسين تجربة المستخدم */
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(66, 135, 245, 0.3);
+  border-radius: 50%;
+  border-top-color: #a8d8ff;
+  animation: spin 1s infinite linear;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* تحسينات إضافية لتجربة المستخدم */
 .form-group input.with-suggestions {
   border-radius: 8px 8px 0 0;
+  border-bottom-color: rgba(66, 135, 245, 0.2);
 }
 
-/* تنسيق للحقول مع معلومات إضافية */
-.field-with-info {
-  position: relative;
-}
-
-.field-info {
+/* أيقونات داخل حقول الإدخال */
+.input-icon {
   position: absolute;
-  left: 5px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #a8d8ff;
-  font-size: 0.85rem;
+  top: 40px;
+  right: 12px;
+  color: rgba(66, 135, 245, 0.7);
   pointer-events: none;
+}
+
+/* تأثيرات إضافية */
+.form-control-animated {
+  transition: all 0.3s ease;
+}
+
+.form-control-animated:focus {
+  transform: translateY(-2px);
+}
+
+.form-group.has-value label {
+  color: #00d4ff;
+}
+
+/* تنسيقات لقسم المعلومات والمساعدة */
+.info-section {
+  background: rgba(0, 40, 80, 0.3);
+  border-radius: 10px;
+  padding: 20px;
+  margin-top: 30px;
+  border: 1px solid rgba(66, 135, 245, 0.2);
+}
+
+.info-title {
+  color: #00d4ff;
+  font-size: 1.2rem;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+.info-content {
+  color: #a8d8ff;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.info-steps {
+  text-align: right;
+  padding-right: 20px;
+}
+
+.info-steps li {
+  margin-bottom: 10px;
+}
+
+/* تنسيق زر التحميل الخاص بالملف */
+.file-upload-container {
+  position: relative;
+  overflow: hidden;
+  display: inline-block;
+  width: 100%;
+}
+
+.file-upload-btn {
+  background: linear-gradient(145deg, #254e77, #1a3c5e);
+  color: white;
+  border-radius: 8px;
+  padding: 12px;
+  display: block;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(66, 135, 245, 0.4);
+}
+
+.file-upload-btn:hover {
+  background: linear-gradient(145deg, #2e5d8c, #1e4a75);
+  transform: translateY(-2px);
+}
+
+.file-upload-container input[type="file"] {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.file-name-display {
+  margin-top: 8px;
+  padding: 5px 10px;
+  background: rgba(0, 40, 80, 0.2);
+  border-radius: 5px;
+  color: #a8d8ff;
+  text-align: center;
+  font-size: 0.9em;
+  display: none;
+}
+
+.progress-container {
+  height: 5px;
+  width: 100%;
+  background-color: rgba(0, 40, 80, 0.3);
+  border-radius: 10px;
+  margin-top: 10px;
+  overflow: hidden;
+  display: none;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #1e90ff, #00d4ff);
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+
+/* علامة تحقق جديدة للحقول عند إدخال قيمة صحيحة */
+.form-group.validated::after {
+  content: "✓";
+  position: absolute;
+  top: 42px;
+  left: 12px;
+  color: #28a745;
+  font-weight: bold;
+}
+
+/* قسم "جاري البحث" أكثر جاذبية */
+.searching-effect {
+  font-weight: bold;
+  background: linear-gradient(90deg, #1e90ff, #00d4ff, #1e90ff);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient 2s linear infinite;
+}
+
+@keyframes gradient {
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* تحسينات على ترويسة الصفحة */
+.page-header {
+  position: relative;
+  margin-bottom: 30px;
+}
+
+.page-header h2 {
+  display: inline-block;
+  background: linear-gradient(90deg, #1e90ff, #00d4ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  padding-bottom: 10px;
+  margin-bottom: 5px;
+}
+
+.page-header::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 3px;
+  background: linear-gradient(90deg, #1e90ff, #00d4ff);
+  border-radius: 3px;
+}
+
+.header-subtitle {
+  color: #a8d8ff;
+  font-size: 0.9rem;
+  margin-top: 5px;
 }
 CSS;
 
-// JavaScript للبحث الذكي
+// JavaScript محسن للبحث الذكي
 $page_js = <<<JS
 <script>
 // متغيرات عامة للبحث الذكي
 let searchTimeouts = {};
 let currentFocus = -1;
 let currentField = null;
+let searchHistory = {};
+let validatedFields = new Set();
 
-// دالة البحث الذكي العامة
+// تحسين تجربة المستخدم بتنفيذ الأحداث بعد تحميل الصفحة
+document.addEventListener('DOMContentLoaded', function() {
+    // إضافة الأيقونات لحقول الإدخال
+    addInputIcons();
+    
+    // تهيئة معالجة ملف الرفع
+    initFileUploadHandler();
+    
+    // إظهار رسائل الخطأ أو النجاح بطريقة متحركة
+    animateMessages();
+    
+    // تفعيل التحقق من الحقول عند تغيير قيمتها
+    setupFormValidation();
+    
+    // إضافة أزرار الماركات الشائعة
+    addQuickBrandButtons();
+    
+    // تحميل مكتبة FontAwesome إذا لم تكن موجودة
+    if (!document.querySelector('link[href*="font-awesome"]')) {
+        const fontAwesome = document.createElement('link');
+        fontAwesome.rel = 'stylesheet';
+        fontAwesome.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css';
+        document.head.appendChild(fontAwesome);
+    }
+    
+    // إضافة تأثيرات التمرير
+    addScrollEffects();
+});
+
+// دالة إضافة أيقونات إلى حقول الإدخال
+function addInputIcons() {
+    const iconMap = {
+        'brandInput': '<i class="fas fa-car"></i>',
+        'modelInput': '<i class="fas fa-car-side"></i>',
+        'yearInput': '<i class="fas fa-calendar-alt"></i>',
+        'ecuNumberInput': '<i class="fas fa-microchip"></i>',
+        'ecuVersionInput': '<i class="fas fa-code-branch"></i>',
+        'eepromTypeInput': '<i class="fas fa-memory"></i>'
+    };
+    
+    Object.entries(iconMap).forEach(([id, icon]) => {
+        const inputGroup = document.getElementById(id)?.parentElement;
+        if (inputGroup) {
+            const iconElement = document.createElement('span');
+            iconElement.className = 'input-icon';
+            iconElement.innerHTML = icon;
+            inputGroup.appendChild(iconElement);
+        }
+    });
+}
+
+// دالة لتهيئة معالجة ملف الرفع
+function initFileUploadHandler() {
+    const fileInput = document.getElementById('eeprom_file');
+    const fileNameDisplay = document.querySelector('.file-name-display');
+    const progressContainer = document.querySelector('.progress-container');
+    const progressBar = document.querySelector('.progress-bar');
+    
+    if (fileInput && fileNameDisplay) {
+        fileInput.addEventListener('change', function(e) {
+            if (this.files.length > 0) {
+                const fileName = this.files[0].name;
+                const fileSize = (this.files[0].size / 1024 / 1024).toFixed(2);
+                
+                fileNameDisplay.textContent = fileName + ' (' + fileSize + ' MB)';
+                fileNameDisplay.style.display = 'block';
+                
+                // للتوضيح فقط - محاكاة تقدم التحميل
+                if (progressContainer && progressBar) {
+                    progressContainer.style.display = 'block';
+                    let width = 0;
+                    const interval = setInterval(() => {
+                        if (width >= 100) {
+                            clearInterval(interval);
+                            setTimeout(() => {
+                                progressContainer.style.display = 'none';
+                            }, 500);
+                        } else {
+                            width += 5;
+                            progressBar.style.width = width + '%';
+                        }
+                    }, 50);
+                }
+                
+                // التحقق من الامتداد
+                const extension = fileName.split('.').pop().toLowerCase();
+                if (['bin', 'hex'].indexOf(extension) === -1) {
+                    showTooltip(fileInput, 'يجب أن يكون الملف بصيغة .bin أو .hex فقط');
+                }
+            }
+        });
+    }
+}
+
+// دالة لإظهار رسائل الخطأ أو النجاح بطريقة متحركة
+function animateMessages() {
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(alert => {
+        // تطبيق تأثير ظهور تدريجي
+        alert.style.opacity = '0';
+        alert.style.transform = 'translateY(-20px)';
+        alert.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+        
+        setTimeout(() => {
+            alert.style.opacity = '1';
+            alert.style.transform = 'translateY(0)';
+        }, 100);
+        
+        // إضافة زر إغلاق إذا لم يكن موجوداً
+        if (!alert.querySelector('.btn-close')) {
+            const closeBtn = document.createElement('button');
+            closeBtn.className = 'btn-close';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.onclick = function() {
+                alert.style.opacity = '0';
+                alert.style.transform = 'translateY(-20px)';
+                setTimeout(() => {
+                    alert.remove();
+                }, 500);
+            };
+            alert.appendChild(closeBtn);
+            alert.classList.add('alert-dismissible');
+        }
+    });
+}
+
+// دالة لتعيين التحقق من الحقول
+function setupFormValidation() {
+    const inputs = document.querySelectorAll('.form input[type="text"]');
+    
+    inputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            validateField(this.id);
+        });
+        
+        input.addEventListener('input', function() {
+            // إضافة تصنيف للحقل الذي يحتوي على قيمة
+            this.parentElement.classList.toggle('has-value', this.value.trim() !== '');
+        });
+    });
+}
+
+// دالة البحث الذكي العامة المحسنة
 function performSmartSearch(field, query, action) {
     const minLength = 2;
     const suggestionContainer = document.getElementById(field + 'Suggestions');
@@ -324,6 +688,13 @@ function performSmartSearch(field, query, action) {
     // إخفاء الاقتراحات إذا كان النص قصيراً
     if (query.length < minLength) {
         hideSuggestions(field);
+        return;
+    }
+    
+    // تحقق من سجل البحث لتجنب تكرار البحث بنفس المعايير
+    const searchKey = field + ':' + action + ':' + query;
+    if (searchHistory[searchKey]) {
+        displaySuggestions(field, searchHistory[searchKey]);
         return;
     }
     
@@ -336,21 +707,28 @@ function performSmartSearch(field, query, action) {
     searchTimeouts[field] = setTimeout(() => {
         showLoading(field);
         
-        fetch(\`search_airbag_ecus.php?action=\${action}&q=\` + encodeURIComponent(query))
-            .then(response => response.json())
+        fetch(`search_airbag_ecus.php?action=\${action}&q=` + encodeURIComponent(query))
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('فشل في الاتصال بالخادم');
+                }
+                return response.json();
+            })
             .then(data => {
                 hideLoading(field);
+                // حفظ النتائج في سجل البحث
+                searchHistory[searchKey] = data;
                 displaySuggestions(field, data);
             })
             .catch(error => {
                 console.error('خطأ في البحث:', error);
                 hideLoading(field);
-                showError(field, 'خطأ في البحث');
+                showError(field, 'حدث خطأ أثناء البحث، يرجى المحاولة مرة أخرى');
             });
     }, 300); // تأخير 300ms
 }
 
-// دالة عرض الاقتراحات
+// دالة عرض الاقتراحات المحسنة
 function displaySuggestions(field, suggestions) {
     const container = document.getElementById(field + 'Suggestions');
     const input = document.getElementById(field + 'Input');
@@ -363,13 +741,32 @@ function displaySuggestions(field, suggestions) {
     if (suggestions.length === 0) {
         container.innerHTML = '<div class="no-suggestions">لا توجد نتائج مطابقة</div>';
         container.style.display = 'block';
+        input.classList.add('with-suggestions');
         return;
     }
     
     suggestions.forEach((item, index) => {
         const div = document.createElement('div');
         div.className = 'suggestion-item';
-        div.textContent = item;
+        
+        // تمييز الجزء المطابق من النص
+        const query = input.value.toLowerCase();
+        const itemText = item.toString();
+        const lowerItemText = itemText.toLowerCase();
+        
+        if (lowerItemText.includes(query)) {
+            const startIndex = lowerItemText.indexOf(query);
+            const endIndex = startIndex + query.length;
+            
+            const beforeMatch = itemText.substring(0, startIndex);
+            const match = itemText.substring(startIndex, endIndex);
+            const afterMatch = itemText.substring(endIndex);
+            
+            div.innerHTML = beforeMatch + '<strong style="color:#00d4ff">' + match + '</strong>' + afterMatch;
+        } else {
+            div.textContent = itemText;
+        }
+        
         div.onclick = () => selectSuggestion(field, item);
         div.addEventListener('mouseenter', () => {
             currentFocus = index;
@@ -381,25 +778,69 @@ function displaySuggestions(field, suggestions) {
     container.style.display = 'block';
     input.classList.add('with-suggestions');
     currentField = field;
+    
+    // إضافة تأثير للظهور
+    container.style.opacity = '0';
+    container.style.transform = 'translateY(-10px)';
+    container.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+    
+    setTimeout(() => {
+        container.style.opacity = '1';
+        container.style.transform = 'translateY(0)';
+    }, 10);
 }
 
-// دالة اختيار اقتراح
+// دالة اختيار اقتراح محسنة
 function selectSuggestion(field, value) {
     const input = document.getElementById(field + 'Input');
     if (input) {
         input.value = value;
         hideSuggestions(field);
         
+        // تحقق من الحقل بعد الاختيار
+        validateField(field + 'Input');
+        
         // تشغيل أحداث خاصة حسب الحقل
         if (field === 'brand') {
             // مسح النماذج والسنوات عند تغيير الماركة
             clearField('model');
             clearField('year');
+            clearField('ecuNumber');
+            clearField('eepromType');
             triggerBrandChange();
         } else if (field === 'model') {
             // مسح السنوات عند تغيير النموذج
             clearField('year');
+            clearField('ecuNumber');
+            clearField('eepromType');
             triggerModelChange();
+        } else if (field === 'year') {
+            clearField('ecuNumber');
+            clearField('eepromType');
+            triggerYearChange();
+        } else if (field === 'ecuNumber') {
+            clearField('eepromType');
+            triggerECUChange();
+        }
+        
+        // تحريك التركيز إلى الحقل التالي
+        moveToNextField(field);
+    }
+}
+
+// دالة للانتقال إلى الحقل التالي
+function moveToNextField(currentField) {
+    const fieldOrder = ['brand', 'model', 'year', 'ecuNumber', 'ecuVersion', 'eepromType'];
+    const currentIndex = fieldOrder.indexOf(currentField);
+    
+    if (currentIndex !== -1 && currentIndex < fieldOrder.length - 1) {
+        const nextField = fieldOrder[currentIndex + 1] + 'Input';
+        const nextInput = document.getElementById(nextField);
+        
+        if (nextInput) {
+            setTimeout(() => {
+                nextInput.focus();
+            }, 100);
         }
     }
 }
@@ -410,21 +851,49 @@ function hideSuggestions(field) {
     const input = document.getElementById(field + 'Input');
     
     if (container) {
-        container.style.display = 'none';
+        // إضافة تأثير للاختفاء
+        container.style.opacity = '0';
+        container.style.transform = 'translateY(-10px)';
+        
+        setTimeout(() => {
+            container.style.display = 'none';
+        }, 300);
     }
+    
     if (input) {
         input.classList.remove('with-suggestions');
     }
+    
     currentField = null;
     currentFocus = -1;
 }
 
-// دالة عرض حالة التحميل
+// دالة عرض حالة التحميل محسنة
 function showLoading(field) {
     const container = document.getElementById(field + 'Suggestions');
     if (container) {
-        container.innerHTML = '<div class="loading-indicator">جاري البحث...</div>';
+        container.innerHTML = `
+            <div class="loading-indicator">
+                <div class="loading-spinner"></div>
+                <span class="searching-effect">جاري البحث...</span>
+            </div>
+        `;
         container.style.display = 'block';
+        
+        const input = document.getElementById(field + 'Input');
+        if (input) {
+            input.classList.add('with-suggestions');
+        }
+        
+        // تأثير الظهور
+        container.style.opacity = '0';
+        container.style.transform = 'translateY(-10px)';
+        container.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        
+        setTimeout(() => {
+            container.style.opacity = '1';
+            container.style.transform = 'translateY(0)';
+        }, 10);
     }
 }
 
@@ -433,21 +902,131 @@ function hideLoading(field) {
     // يتم استدعاؤها تلقائياً عند عرض النتائج
 }
 
-// دالة عرض خطأ
+// دالة عرض خطأ محسنة
 function showError(field, message) {
     const container = document.getElementById(field + 'Suggestions');
     if (container) {
-        container.innerHTML = \`<div class="no-suggestions">\${message}</div>\`;
+        container.innerHTML = `<div class="no-suggestions">❌ ${message}</div>`;
         container.style.display = 'block';
+        
+        const input = document.getElementById(field + 'Input');
+        if (input) {
+            input.classList.add('with-suggestions');
+            
+            // تأثير إضافي للخطأ
+            input.style.borderColor = 'rgba(220, 53, 69, 0.5)';
+            setTimeout(() => {
+                input.style.borderColor = '';
+            }, 2000);
+        }
+        
+        // تأثير الظهور
+        container.style.opacity = '0';
+        container.style.transform = 'translateY(-10px)';
+        container.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        
+        setTimeout(() => {
+            container.style.opacity = '1';
+            container.style.transform = 'translateY(0)';
+        }, 10);
     }
 }
 
-// دالة مسح حقل
+// دالة للتحقق من حقل
+function validateField(fieldId) {
+    const input = document.getElementById(fieldId);
+    if (!input) return;
+    
+    const value = input.value.trim();
+    const formGroup = input.parentElement;
+    
+    // إزالة تصنيف التحقق السابق
+    formGroup.classList.remove('validated');
+    
+    if (value !== '') {
+        // تأكد من أن الماركة والموديل موجودان قبل التحقق من الحقول الأخرى
+        if (fieldId === 'yearInput' || fieldId === 'ecuNumberInput' || fieldId === 'eepromTypeInput') {
+            const brand = document.getElementById('brandInput').value.trim();
+            const model = document.getElementById('modelInput').value.trim();
+            
+            if (brand === '' || model === '') {
+                showTooltip(input, 'يرجى ملء البيانات السابقة أولاً');
+                return false;
+            }
+        }
+        
+        // إضافة تصنيف التحقق
+        formGroup.classList.add('validated');
+        validatedFields.add(fieldId);
+        return true;
+    }
+    
+    return false;
+}
+
+// دالة لإظهار تلميح
+function showTooltip(element, message) {
+    // إنشاء التلميح إذا لم يكن موجوداً
+    let tooltip = document.querySelector('.custom-tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.className = 'custom-tooltip';
+        document.body.appendChild(tooltip);
+        
+        // تصميم التلميح
+        tooltip.style.position = 'absolute';
+        tooltip.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+        tooltip.style.color = '#fff';
+        tooltip.style.padding = '8px 15px';
+        tooltip.style.borderRadius = '6px';
+        tooltip.style.fontSize = '14px';
+        tooltip.style.zIndex = '9999';
+        tooltip.style.boxShadow = '0 4px 10px rgba(0,0,0,0.3)';
+        tooltip.style.border = '1px solid rgba(66, 135, 245, 0.4)';
+        tooltip.style.maxWidth = '250px';
+        tooltip.style.textAlign = 'center';
+    }
+    
+    // تعيين الرسالة
+    tooltip.textContent = message;
+    
+    // تعيين الموقع
+    const rect = element.getBoundingClientRect();
+    tooltip.style.top = (rect.bottom + 10) + 'px';
+    tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px';
+    
+    // إظهار التلميح بتأثير
+    tooltip.style.opacity = '0';
+    tooltip.style.transform = 'translateY(-10px)';
+    tooltip.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+    tooltip.style.display = 'block';
+    
+    setTimeout(() => {
+        tooltip.style.opacity = '1';
+        tooltip.style.transform = 'translateY(0)';
+    }, 10);
+    
+    // إخفاء التلميح بعد فترة
+    setTimeout(() => {
+        tooltip.style.opacity = '0';
+        tooltip.style.transform = 'translateY(-10px)';
+        
+        setTimeout(() => {
+            tooltip.style.display = 'none';
+        }, 300);
+    }, 3000);
+}
+
+// دالة مسح حقل محسنة
 function clearField(field) {
     const input = document.getElementById(field + 'Input');
     if (input) {
         input.value = '';
         hideSuggestions(field);
+        
+        // إزالة تصنيف التحقق
+        input.parentElement.classList.remove('validated', 'has-value');
+        validatedFields.delete(field + 'Input');
     }
 }
 
@@ -457,28 +1036,38 @@ function updateActiveSuggestion(field) {
     if (!container) return;
     
     const items = container.getElementsByClassName('suggestion-item');
+    
     Array.from(items).forEach((item, index) => {
         item.classList.toggle('active', index === currentFocus);
+        
+        // تمرير إلى العنصر النشط
+        if (index === currentFocus) {
+            item.scrollIntoView({
+                block: 'nearest',
+                behavior: 'smooth'
+            });
+        }
     });
 }
 
-// دالة التنقل بلوحة المفاتيح
+// دالة التنقل بلوحة المفاتيح محسنة
 function handleKeyDown(field, event) {
     const container = document.getElementById(field + 'Suggestions');
     if (!container || container.style.display === 'none') return;
     
     const items = container.getElementsByClassName('suggestion-item');
+    if (items.length === 0) return;
     
     switch(event.key) {
         case 'ArrowDown':
             event.preventDefault();
-            currentFocus = Math.min(currentFocus + 1, items.length - 1);
+            currentFocus = (currentFocus + 1) % items.length;
             updateActiveSuggestion(field);
             break;
             
         case 'ArrowUp':
             event.preventDefault();
-            currentFocus = Math.max(currentFocus - 1, -1);
+            currentFocus = currentFocus <= 0 ? items.length - 1 : currentFocus - 1;
             updateActiveSuggestion(field);
             break;
             
@@ -486,16 +1075,29 @@ function handleKeyDown(field, event) {
             event.preventDefault();
             if (currentFocus >= 0 && items[currentFocus]) {
                 items[currentFocus].click();
+            } else if (items.length === 1) {
+                // إذا كان هناك اقتراح واحد فقط، اختره تلقائياً
+                items[0].click();
             }
             break;
             
         case 'Escape':
             hideSuggestions(field);
             break;
+            
+        case 'Tab':
+            if (items.length === 1) {
+                // إذا كان هناك اقتراح واحد فقط عند الضغط على Tab، اختره تلقائياً
+                event.preventDefault();
+                items[0].click();
+            } else {
+                hideSuggestions(field);
+            }
+            break;
     }
 }
 
-// دوال خاصة لكل حقل
+// دوال خاصة محسنة لكل حقل
 function searchBrands(query) {
     performSmartSearch('brand', query, 'brands');
 }
@@ -506,7 +1108,7 @@ function searchModels(query) {
         showError('model', 'يرجى اختيار الماركة أولاً');
         return;
     }
-    performSmartSearch('model', query, \`models&brand=\${encodeURIComponent(brand)}\`);
+    performSmartSearch('model', query, `models&brand=${encodeURIComponent(brand)}`);
 }
 
 function searchYears(query) {
@@ -517,7 +1119,7 @@ function searchYears(query) {
         showError('year', 'يرجى اختيار الماركة والموديل أولاً');
         return;
     }
-    performSmartSearch('year', query, \`years&brand=\${encodeURIComponent(brand)}&model=\${encodeURIComponent(model)}\`);
+    performSmartSearch('year', query, `years&brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}`);
 }
 
 function searchECUs(query) {
@@ -530,9 +1132,9 @@ function searchECUs(query) {
         return;
     }
     
-    let searchUrl = \`ecus&brand=\${encodeURIComponent(brand)}&model=\${encodeURIComponent(model)}\`;
+    let searchUrl = `ecus&brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}`;
     if (year) {
-        searchUrl += \`&year=\${encodeURIComponent(year)}\`;
+        searchUrl += `&year=${encodeURIComponent(year)}`;
     }
     performSmartSearch('ecuNumber', query, searchUrl);
 }
@@ -547,27 +1149,100 @@ function searchEEPROMs(query) {
         return;
     }
     
-    let searchUrl = \`eeproms&brand=\${encodeURIComponent(brand)}&model=\${encodeURIComponent(model)}\`;
+    let searchUrl = `eeproms&brand=${encodeURIComponent(brand)}&model=${encodeURIComponent(model)}`;
     if (ecu) {
-        searchUrl += \`&ecu=\${encodeURIComponent(ecu)}\`;
+        searchUrl += `&ecu=${encodeURIComponent(ecu)}`;
     }
     performSmartSearch('eepromType', query, searchUrl);
 }
 
-// دوال الأحداث
+// دوال الأحداث المحسنة
 function triggerBrandChange() {
-    // يمكن إضافة منطق إضافي عند تغيير الماركة
     console.log('تم تغيير الماركة');
+    // يمكن إضافة محتوى الموديلات الشائعة للماركة المختارة
+    const brandInput = document.getElementById('brandInput');
+    const modelInput = document.getElementById('modelInput');
+    
+    if (brandInput && modelInput) {
+        modelInput.placeholder = `اكتب موديل ${brandInput.value}...`;
+        
+        // تأثير بصري لتنبيه المستخدم بالحقل التالي
+        setTimeout(() => {
+            modelInput.classList.add('form-control-animated');
+            modelInput.focus();
+            
+            setTimeout(() => {
+                modelInput.classList.remove('form-control-animated');
+            }, 1000);
+        }, 100);
+    }
 }
 
 function triggerModelChange() {
-    // يمكن إضافة منطق إضافي عند تغيير الموديل
     console.log('تم تغيير الموديل');
+    
+    const brandInput = document.getElementById('brandInput');
+    const modelInput = document.getElementById('modelInput');
+    const yearInput = document.getElementById('yearInput');
+    
+    if (brandInput && modelInput && yearInput) {
+        yearInput.placeholder = `سنة صنع ${brandInput.value} ${modelInput.value}...`;
+        
+        // تأثير بصري لتنبيه المستخدم بالحقل التالي
+        setTimeout(() => {
+            yearInput.classList.add('form-control-animated');
+            yearInput.focus();
+            
+            setTimeout(() => {
+                yearInput.classList.remove('form-control-animated');
+            }, 1000);
+        }, 100);
+    }
+}
+
+function triggerYearChange() {
+    console.log('تم تغيير السنة');
+    
+    const ecuNumberInput = document.getElementById('ecuNumberInput');
+    
+    if (ecuNumberInput) {
+        ecuNumberInput.placeholder = `اكتب رقم وحدة ECU...`;
+        
+        // تأثير بصري لتنبيه المستخدم بالحقل التالي
+        setTimeout(() => {
+            ecuNumberInput.classList.add('form-control-animated');
+            ecuNumberInput.focus();
+            
+            setTimeout(() => {
+                ecuNumberInput.classList.remove('form-control-animated');
+            }, 1000);
+        }, 100);
+    }
+}
+
+function triggerECUChange() {
+    console.log('تم تغيير رقم الكمبيوتر');
+    
+    const eepromTypeInput = document.getElementById('eepromTypeInput');
+    
+    if (eepromTypeInput) {
+        eepromTypeInput.placeholder = `اكتب نوع EEPROM...`;
+        
+        // تأثير بصري لتنبيه المستخدم بالحقل التالي
+        setTimeout(() => {
+            eepromTypeInput.classList.add('form-control-animated');
+            eepromTypeInput.focus();
+            
+            setTimeout(() => {
+                eepromTypeInput.classList.remove('form-control-animated');
+            }, 1000);
+        }, 100);
+    }
 }
 
 // إخفاء الاقتراحات عند النقر خارجها
 document.addEventListener('click', function(event) {
-    if (currentField && !event.target.closest(\`#\${currentField}Input, #\${currentField}Suggestions\`)) {
+    if (currentField && !event.target.closest(`#${currentField}Input, #${currentField}Suggestions`)) {
         hideSuggestions(currentField);
     }
 });
@@ -576,6 +1251,175 @@ document.addEventListener('click', function(event) {
 window.addEventListener('beforeunload', function() {
     Object.values(searchTimeouts).forEach(timeout => clearTimeout(timeout));
 });
+
+// دالة لعرض تلميح المساعدة
+function showHelp(field) {
+    const helpMap = {
+        'brand': 'أدخل اسم الشركة المصنعة للسيارة مثل تويوتا، هوندا، بي إم دبليو، إلخ.',
+        'model': 'أدخل موديل السيارة مثل كامري، أكورد، X5، إلخ.',
+        'year': 'أدخل سنة صنع السيارة باستخدام 4 أرقام، مثل 2020.',
+        'ecuNumber': 'أدخل رقم وحدة التحكم الإلكترونية الموجود على العلبة الخاصة بها.',
+        'ecuVersion': 'أدخل رقم الإصدار إن وجد، مثل V1.0 أو Rev A.',
+        'eepromType': 'أدخل نوع شريحة EEPROM مثل 24C02, 24C04, 24C08 إلخ.'
+    };
+    
+    showTooltip(document.getElementById(field + 'Input'), helpMap[field] || 'أدخل المعلومات المطلوبة');
+}
+
+// إضافة وظيفة البحث السريع للماركات الشائعة
+function addQuickBrandButtons() {
+    // الماركات الشائعة
+    const commonBrands = ['تويوتا', 'هوندا', 'نيسان', 'مرسيدس', 'بي إم دبليو', 'أودي', 'هيونداي', 'كيا'];
+    
+    // إنشاء حاوية الأزرار
+    const container = document.createElement('div');
+    container.className = 'quick-brands';
+    container.style.display = 'flex';
+    container.style.flexWrap = 'wrap';
+    container.style.gap = '10px';
+    container.style.justifyContent = 'center';
+    container.style.margin = '15px 0';
+    
+    // إضافة عنوان
+    const title = document.createElement('div');
+    title.textContent = 'الماركات الشائعة:';
+    title.style.width = '100%';
+    title.style.textAlign = 'center';
+    title.style.color = '#a8d8ff';
+    title.style.marginBottom = '8px';
+    container.appendChild(title);
+    
+    // إنشاء زر لكل ماركة
+    commonBrands.forEach(brand => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = brand;
+        button.className = 'quick-brand-btn';
+        button.style.background = 'rgba(0, 40, 80, 0.5)';
+        button.style.border = '1px solid rgba(66, 135, 245, 0.4)';
+        button.style.borderRadius = '6px';
+        button.style.padding = '5px 12px';
+        button.style.color = 'white';
+        button.style.cursor = 'pointer';
+        button.style.transition = 'all 0.3s ease';
+        
+        button.onmouseover = function() {
+            this.style.background = 'rgba(30, 144, 255, 0.3)';
+            this.style.transform = 'translateY(-2px)';
+        };
+        
+        button.onmouseout = function() {
+            this.style.background = 'rgba(0, 40, 80, 0.5)';
+            this.style.transform = 'translateY(0)';
+        };
+        
+        button.onclick = function() {
+            const brandInput = document.getElementById('brandInput');
+            if (brandInput) {
+                brandInput.value = brand;
+                validateField('brandInput');
+                triggerBrandChange();
+            }
+        };
+        
+        container.appendChild(button);
+    });
+    
+    // إضافة الحاوية قبل نموذج البحث
+    const form = document.querySelector('.form');
+    if (form) {
+        form.parentNode.insertBefore(container, form);
+    }
+}
+
+// دالة لإضافة تأثيرات التمرير
+function addScrollEffects() {
+    // إضافة تأثيرات ظهور العناصر عند التمرير
+    const animateItems = document.querySelectorAll('.form-group, .info-section, .alert');
+    
+    // تحقق من دعم IntersectionObserver
+    if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animated-item');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, {
+            root: null,
+            threshold: 0.1,
+            rootMargin: '0px'
+        });
+        
+        animateItems.forEach(item => {
+            // تعيين النمط الأولي
+            item.style.opacity = '0';
+            item.style.transform = 'translateY(20px)';
+            item.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+            
+            observer.observe(item);
+        });
+        
+        // إضافة تصنيف للعناصر المرئية
+        document.addEventListener('scroll', () => {
+            animateItems.forEach(item => {
+                const rect = item.getBoundingClientRect();
+                const isVisible = rect.top < window.innerHeight && rect.bottom >= 0;
+                
+                if (isVisible && !item.classList.contains('animated-item')) {
+                    item.classList.add('animated-item');
+                    item.style.opacity = '1';
+                    item.style.transform = 'translateY(0)';
+                }
+            });
+        });
+    } else {
+        // المتصفحات التي لا تدعم IntersectionObserver
+        animateItems.forEach(item => {
+            item.style.opacity = '1';
+            item.style.transform = 'translateY(0)';
+        });
+    }
+}
+
+// دالة للتحقق من صحة النموذج قبل الإرسال
+function validateForm() {
+    const requiredFields = ['brand', 'model', 'ecuNumber', 'eepromType'];
+    let isValid = true;
+    
+    requiredFields.forEach(field => {
+        const input = document.getElementById(field + 'Input');
+        if (!input || !input.value.trim()) {
+            isValid = false;
+            input.style.borderColor = 'rgba(220, 53, 69, 0.8)';
+            
+            setTimeout(() => {
+                input.style.borderColor = '';
+            }, 3000);
+            
+            showTooltip(input, 'هذا الحقل مطلوب');
+        }
+    });
+    
+    // التحقق من الملف
+    const fileInput = document.getElementById('eeprom_file');
+    if (!fileInput || !fileInput.files.length) {
+        isValid = false;
+        const fileLabel = document.querySelector('.file-upload-btn');
+        if (fileLabel) {
+            fileLabel.style.borderColor = 'rgba(220, 53, 69, 0.8)';
+            
+            setTimeout(() => {
+                fileLabel.style.borderColor = '';
+            }, 3000);
+        }
+        
+        showTooltip(fileInput.parentElement, 'يرجى اختيار ملف');
+    }
+    
+    return isValid;
+}
 </script>
 JS;
 
@@ -583,7 +1427,10 @@ JS;
 ob_start();
 ?>
 <div class="container">
-    <h2><?= $display_title ?></h2>
+    <div class="page-header">
+        <h2><?= $display_title ?></h2>
+        <div class="header-subtitle">نظام آمن لمسح بيانات الحادث وإعادة برمجة وحدة الإيرباق</div>
+    </div>
 
     <?php
     // عرض رسائل الخطأ أو النجاح
@@ -591,39 +1438,56 @@ ob_start();
     if ($success) showMessage('success', $success);
     ?>
 
-    <form method="POST" enctype="multipart/form-data" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>" class="form">
+    <form method="POST" enctype="multipart/form-data" action="<?= htmlspecialchars($_SERVER['PHP_SELF']) ?>" class="form" onsubmit="return validateForm()">
         <!-- توكن CSRF -->
         <input type="hidden" name="csrf_token" value="<?= $csrf_token ?>">
         
         <!-- ماركة السيارة مع البحث الذكي -->
         <div class="form-group">
-            <label for="brandInput">ماركة السيارة:</label>
+            <label for="brandInput">
+                ماركة السيارة <span style="color: #ff6b6b">*</span>
+                <button type="button" class="btn-help" onclick="showHelp('brand')" style="background: none; border: none; color: #a8d8ff; font-size: 0.8rem; cursor: help;">
+                    <i class="fas fa-question-circle"></i>
+                </button>
+            </label>
             <input type="text" id="brandInput" name="brand" required
                    maxlength="50"
                    value="<?= htmlspecialchars($brand ?? '', ENT_QUOTES) ?>"
                    onkeyup="searchBrands(this.value)"
                    onkeydown="handleKeyDown('brand', event)"
                    placeholder="اكتب لبدء البحث..."
-                   autocomplete="off">
+                   autocomplete="off"
+                   class="form-control-animated">
             <div id="brandSuggestions" class="suggestions-container"></div>
         </div>
 
         <!-- موديل السيارة مع البحث الذكي -->
         <div class="form-group">
-            <label for="modelInput">موديل السيارة:</label>
+            <label for="modelInput">
+                موديل السيارة <span style="color: #ff6b6b">*</span>
+                <button type="button" class="btn-help" onclick="showHelp('model')" style="background: none; border: none; color: #a8d8ff; font-size: 0.8rem; cursor: help;">
+                    <i class="fas fa-question-circle"></i>
+                </button>
+            </label>
             <input type="text" id="modelInput" name="model" required
                    maxlength="50"
                    value="<?= htmlspecialchars($model ?? '', ENT_QUOTES) ?>"
                    onkeyup="searchModels(this.value)"
                    onkeydown="handleKeyDown('model', event)"
-                   placeholder="اكتب لبدء البحث..."
-                   autocomplete="off">
+                   placeholder="اختر الماركة أولاً..."
+                   autocomplete="off"
+                   class="form-control-animated">
             <div id="modelSuggestions" class="suggestions-container"></div>
         </div>
 
         <!-- سنة الصنع مع البحث الذكي -->
         <div class="form-group">
-            <label for="yearInput">سنة الصنع (اختياري):</label>
+            <label for="yearInput">
+                سنة الصنع (اختياري)
+                <button type="button" class="btn-help" onclick="showHelp('year')" style="background: none; border: none; color: #a8d8ff; font-size: 0.8rem; cursor: help;">
+                    <i class="fas fa-question-circle"></i>
+                </button>
+            </label>
             <input type="text" id="yearInput" name="year"
                    maxlength="4"
                    pattern="[0-9]+"
@@ -631,15 +1495,21 @@ ob_start();
                    value="<?= htmlspecialchars($year ?? '', ENT_QUOTES) ?>"
                    onkeyup="searchYears(this.value)"
                    onkeydown="handleKeyDown('year', event)"
-                   placeholder="اكتب لبدء البحث..."
-                   autocomplete="off">
+                   placeholder="اختر الماركة والموديل أولاً..."
+                   autocomplete="off"
+                   class="form-control-animated">
             <div id="yearSuggestions" class="suggestions-container"></div>
             <small class="form-text">السنة اختيارية ولكنها تساعد في تحديد نوع ECU المناسب</small>
         </div>
 
         <!-- رقم وحدة ECU مع البحث الذكي -->
         <div class="form-group">
-            <label for="ecuNumberInput">رقم وحدة ECU:</label>
+            <label for="ecuNumberInput">
+                رقم وحدة ECU <span style="color: #ff6b6b">*</span>
+                <button type="button" class="btn-help" onclick="showHelp('ecuNumber')" style="background: none; border: none; color: #a8d8ff; font-size: 0.8rem; cursor: help;">
+                    <i class="fas fa-question-circle"></i>
+                </button>
+            </label>
             <input type="text" id="ecuNumberInput" name="ecu_number" required
                    maxlength="50"
                    pattern="[A-Za-z0-9-.]+"
@@ -647,14 +1517,20 @@ ob_start();
                    value="<?= htmlspecialchars($ecu_number ?? '', ENT_QUOTES) ?>"
                    onkeyup="searchECUs(this.value)"
                    onkeydown="handleKeyDown('ecuNumber', event)"
-                   placeholder="اكتب لبدء البحث..."
-                   autocomplete="off">
+                   placeholder="اختر الماركة والموديل أولاً..."
+                   autocomplete="off"
+                   class="form-control-animated">
             <div id="ecuNumberSuggestions" class="suggestions-container"></div>
         </div>
 
         <!-- إصدار ECU (اختياري) -->
         <div class="form-group">
-            <label for="ecuVersionInput">إصدار ECU (اختياري):</label>
+            <label for="ecuVersionInput">
+                إصدار ECU (اختياري)
+                <button type="button" class="btn-help" onclick="showHelp('ecuVersion')" style="background: none; border: none; color: #a8d8ff; font-size: 0.8rem; cursor: help;">
+                    <i class="fas fa-question-circle"></i>
+                </button>
+            </label>
             <input type="text" id="ecuVersionInput" name="ecu_version"
                    maxlength="20"
                    value="<?= htmlspecialchars($ecu_version ?? '', ENT_QUOTES) ?>"
@@ -664,33 +1540,97 @@ ob_start();
 
         <!-- نوع EEPROM مع البحث الذكي -->
         <div class="form-group">
-            <label for="eepromTypeInput">نوع EEPROM:</label>
+            <label for="eepromTypeInput">
+                نوع EEPROM <span style="color: #ff6b6b">*</span>
+                <button type="button" class="btn-help" onclick="showHelp('eepromType')" style="background: none; border: none; color: #a8d8ff; font-size: 0.8rem; cursor: help;">
+                    <i class="fas fa-question-circle"></i>
+                </button>
+            </label>
             <input type="text" id="eepromTypeInput" name="eeprom_type" required
                    maxlength="50"
                    value="<?= htmlspecialchars($eeprom_type ?? '', ENT_QUOTES) ?>"
                    onkeyup="searchEEPROMs(this.value)"
                    onkeydown="handleKeyDown('eepromType', event)"
-                   placeholder="اكتب لبدء البحث..."
-                   autocomplete="off">
+                   placeholder="اختر الماركة والموديل أولاً..."
+                   autocomplete="off"
+                   class="form-control-animated">
             <div id="eepromTypeSuggestions" class="suggestions-container"></div>
             <small class="form-text">مثل: 24C02, 24C04, 24C08، إلخ</small>
         </div>
 
-        <!-- رفع ملف EEPROM -->
+        <!-- رفع ملف EEPROM محسن -->
         <div class="form-group">
-            <label for="eeprom_file">ملف EEPROM (.bin أو .hex):</label>
-            <input type="file" id="eeprom_file" name="eeprom_file" accept=".bin,.hex" required>
+            <label for="eeprom_file">
+                ملف EEPROM (.bin أو .hex) <span style="color: #ff6b6b">*</span>
+            </label>
+            <div class="file-upload-container">
+                <div class="file-upload-btn">
+                    <i class="fas fa-upload"></i> اختر ملف EEPROM
+                </div>
+                <input type="file" id="eeprom_file" name="eeprom_file" accept=".bin,.hex" required>
+            </div>
+            <div class="file-name-display"></div>
+            <div class="progress-container">
+                <div class="progress-bar"></div>
+            </div>
             <small class="form-text">الحد الأقصى لحجم الملف: 2 ميجابايت</small>
         </div>
 
-        <button type="submit" class="btn btn-primary">إرسال الطلب</button>
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-paper-plane"></i> إرسال الطلب
+        </button>
+        
+        <a href="home.php" class="btn btn-secondary">
+            <i class="fas fa-arrow-right"></i> العودة للصفحة الرئيسية
+        </a>
     </form>
     
-    <!-- عرض تحذير أمان للمستخدم -->
-    <div class="alert alert-info mt-4">
-        <strong>ملاحظة:</strong> يرجى التأكد من صحة الملف المرفوع، حيث سيتم التعامل معه من قبل الفريق الفني.
-        <br>
-        <strong>تلميح:</strong> استخدم ميزة البحث الذكي للحصول على اقتراحات دقيقة أثناء الكتابة.
+    <!-- قسم المعلومات والمساعدة -->
+    <div class="info-section">
+        <div class="info-title">
+            <i class="fas fa-info-circle"></i> معلومات عن خدمة مسح بيانات الإيرباق
+        </div>
+        <div class="info-content">
+            <p>خدمة مسح بيانات الحادث (Airbag Reset) هي عملية آمنة لإعادة برمجة وحدة التحكم في الوسائد الهوائية بعد حادث أو صيانة. تتضمن الخطوات التالية:</p>
+            
+            <ol class="info-steps">
+                <li>قراءة بيانات EEPROM من وحدة التحكم باستخدام جهاز برمجة مناسب.</li>
+                <li>رفع الملف إلى نظامنا عبر هذه الصفحة.</li>
+                <li>يقوم فريقنا الفني بتحليل البيانات ومسح سجلات الحوادث.</li>
+                <li>يتم إرسال الملف المعدل إلى بريدك الإلكتروني خلال 24 ساعة.</li>
+                <li>إعادة كتابة البيانات إلى وحدة التحكم باستخدام نفس جهاز البرمجة.</li>
+            </ol>
+
+            <p><strong>ملاحظة هامة:</strong> البحث الذكي يساعدك في العثور على معلومات دقيقة عن المركبة. كلما أدخلت بيانات أكثر دقة، كلما كانت النتائج أفضل.</p>
+        </div>
+    </div>
+    
+    <!-- قسم الأسئلة الشائعة -->
+    <div class="info-section" style="margin-top: 20px;">
+        <div class="info-title">
+            <i class="fas fa-question-circle"></i> الأسئلة الشائعة
+        </div>
+        <div class="info-content">
+            <details>
+                <summary style="cursor: pointer; color: #00d4ff; margin-bottom: 10px; font-weight: bold;">كيف أعرف رقم وحدة ECU الخاصة بي؟</summary>
+                <p style="padding-right: 20px;">يوجد رقم وحدة ECU عادة على ملصق على علبة وحدة التحكم في الوسائد الهوائية. يمكنك استخدام خاصية البحث الذكي للعثور على الرقم المناسب لمركبتك.</p>
+            </details>
+            
+            <details>
+                <summary style="cursor: pointer; color: #00d4ff; margin-bottom: 10px; font-weight: bold;">ما هو نوع EEPROM المطلوب؟</summary>
+                <p style="padding-right: 20px;">نوع EEPROM هو شريحة الذاكرة الموجودة على لوحة ECU. الأنواع الشائعة تشمل 24C02, 24C04, 24C08, 24C16, 25C160 وغيرها. استخدم البحث الذكي لتحديد النوع المناسب لمركبتك.</p>
+            </details>
+            
+            <details>
+                <summary style="cursor: pointer; color: #00d4ff; margin-bottom: 10px; font-weight: bold;">كم من الوقت تستغرق الخدمة؟</summary>
+                <p style="padding-right: 20px;">عادة ما تستغرق عملية المعالجة من 12 إلى 24 ساعة كحد أقصى، ويتم إرسال الملف المعدل إلى بريدك الإلكتروني المسجل في الحساب.</p>
+            </details>
+            
+            <details>
+                <summary style="cursor: pointer; color: #00d4ff; margin-bottom: 10px; font-weight: bold;">هل الخدمة آمنة؟</summary>
+                <p style="padding-right: 20px;">نعم، جميع العمليات تتم بواسطة فنيين محترفين باستخدام أدوات متخصصة. كما أن جميع الملفات والبيانات مشفرة ومحمية.</p>
+            </details>
+        </div>
     </div>
 </div>
 
