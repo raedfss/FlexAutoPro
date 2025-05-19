@@ -624,8 +624,129 @@ $page_content .= '<div id="imageModal" class="modal">
 
 // JavaScript para autocompletado
 $page_content .= '<script>
-document.addEventListener("DOMContentLoaded",function(){function e(e,t,a,n){const o=document.getElementById(e),i=document.getElementById(t);let c=-1,s=[];o&&i&&(o.addEventListener("input",function(){const e=this.value.trim();if(e.length<1)return void(i.style.display="none");let t="";if(n){const e=n();for(const a in e)e[a]&&(t+="&"+a+"="+encodeURIComponent(e[a]))}fetch("search_airbag_ecus.php?action="+a+"&q="+encodeURIComponent(e)+t).then(e=>e.json()).then(e=>{if(e.error)return void console.error(e.error);if(s=e,0===s.length)return void(i.style.display="none");i.innerHTML="",s.forEach((e,t)=>{const a=document.createElement("div");a.className="autocomplete-item",a.textContent=e,a.addEventListener("click",function(){o.value=e,i.style.display="none"}),i.appendChild(a)}),i.style.display="block",c=-1}).catch(e=>{console.error("Error fetching autocomplete results:",e)})}),o.addEventListener("keydown",function(e){const t=i.querySelectorAll(".autocomplete-item");if(0!==t.length)if("ArrowDown"===e.key)e.preventDefault(),c=(c+1)%t.length,a(t);else if("ArrowUp"===e.key)e.preventDefault(),c=(c-1+t.length)%t.length,a(t);else if("Enter"===e.key&&-1!==c)e.preventDefault(),o.value=s[c],i.style.display="none";else if("Escape"===e.key)i.style.display="none"}),document.addEventListener("click",function(e){e.target!==o&&e.target!==i&&(i.style.display="none")}));function a(e){e.forEach((e,t)=>{t===c?(e.classList.add("selected"),e.scrollIntoView({block:"nearest"})):e.classList.remove("selected")})}}e("brand","brand-results","brands"),e("model","model-results","models",function(){return{brand:document.getElementById("brand")?.value||""}}),e("ecu","ecu-results","ecus",function(){return{brand:document.getElementById("brand")?.value||"",model:document.getElementById("model")?.value||""}});const t=document.querySelectorAll(".file-type-option"),a=document.getElementById("dump_type");t.length>0&&a&&t.forEach(e=>{e.addEventListener("click",function(){t.forEach(e=>e.classList.remove("selected")),this.classList.add("selected"),a.value=this.getAttribute("data-value")})});const n=document.getElementById("dump_file"),o=document.getElementById("file-selected"),i=document.getElementById("file-name");n&&o&&i&&n.addEventListener("change",function(){if(this.files.length>0){i.textContent=this.files[0].name,o.style.display="block";const e=this.files[0].size;if(5242880<e)return alert("حجم الملف كبير جدًا. الحد الأقصى هو 5 ميجابايت."),this.value="",void(o.style.display="none");const t=this.files[0].name.split(".").pop().toLowerCase();["bin","hex","dump","rom","dat","img","eep","srec","zip"].includes(t)||(alert("نوع الملف غير مدعوم. يُسمح فقط بملفات: bin, hex, dump, rom, dat, img, eep, srec, zip"),this.value="",o.style.display="none")}else o.style.display="none"});const c=document.querySelector(".success-message"),s=document.querySelector(".error-message");(c||s)&&setTimeout(function(){c&&(c.style.display="none"),s&&(s.style.display="none")},5e3)});function openImageModal(e){const t=document.getElementById("imageModal"),a=document.getElementById("modalImage");t&&a&&(t.style.display="block",a.src=e)}function closeImageModal(){const e=document.getElementById("imageModal");e&&(e.style.display="none")}window.onclick=function(e){const t=document.getElementById("imageModal");e.target===t&&closeImageModal()};
+document.addEventListener("DOMContentLoaded", function() {
+
+    function setupAutocomplete(inputId, resultsId, action, paramsCallback) {
+        var input = document.getElementById(inputId);
+        var resultsContainer = document.getElementById(resultsId);
+        
+        if (!input || !resultsContainer) {
+            return;
+        }
+
+        var selectedIndex = -1;
+        var items = [];
+
+        input.addEventListener("input", function() {
+            var query = this.value.trim();
+            if (query.length < 1) {
+                resultsContainer.style.display = "none";
+                return;
+            }
+
+            var extraParams = "";
+            if (typeof paramsCallback === "function") {
+                var params = paramsCallback();
+                for (var key in params) {
+                    if (params.hasOwnProperty(key) && params[key]) {
+                        extraParams += "&" + encodeURIComponent(key) + "=" + encodeURIComponent(params[key]);
+                    }
+                }
+            }
+
+            fetch("search_airbag_ecus.php?action=" + action + "&q=" + encodeURIComponent(query) + extraParams)
+                .then(function(response) { return response.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        console.error(data.error);
+                        return;
+                    }
+
+                    items = data;
+                    if (items.length === 0) {
+                        resultsContainer.style.display = "none";
+                        return;
+                    }
+
+                    resultsContainer.innerHTML = "";
+                    items.forEach(function(item, index) {
+                        var div = document.createElement("div");
+                        div.className = "autocomplete-item";
+                        div.textContent = item;
+                        div.addEventListener("click", function() {
+                            input.value = item;
+                            resultsContainer.style.display = "none";
+                        });
+                        resultsContainer.appendChild(div);
+                    });
+
+                    resultsContainer.style.display = "block";
+                    selectedIndex = -1;
+                })
+                .catch(function(error) {
+                    console.error("Error fetching autocomplete results:", error);
+                });
+        });
+
+        input.addEventListener("keydown", function(e) {
+            var itemElements = resultsContainer.querySelectorAll(".autocomplete-item");
+            if (itemElements.length === 0) return;
+
+            if (e.key === "ArrowDown") {
+                e.preventDefault();
+                selectedIndex = (selectedIndex + 1) % itemElements.length;
+                updateSelectedItem(itemElements);
+            } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                selectedIndex = (selectedIndex - 1 + itemElements.length) % itemElements.length;
+                updateSelectedItem(itemElements);
+            } else if (e.key === "Enter" && selectedIndex !== -1) {
+                e.preventDefault();
+                input.value = items[selectedIndex];
+                resultsContainer.style.display = "none";
+            } else if (e.key === "Escape") {
+                resultsContainer.style.display = "none";
+            }
+        });
+
+        document.addEventListener("click", function(e) {
+            if (e.target !== input && e.target.parentNode !== resultsContainer) {
+                resultsContainer.style.display = "none";
+            }
+        });
+
+        function updateSelectedItem(itemElements) {
+            itemElements.forEach(function(item, index) {
+                if (index === selectedIndex) {
+                    item.classList.add("selected");
+                    item.scrollIntoView({ block: "nearest" });
+                } else {
+                    item.classList.remove("selected");
+                }
+            });
+        }
+    }
+
+    setupAutocomplete("brand", "brand-results", "brands");
+    setupAutocomplete("model", "model-results", "models", function() {
+        var brandInput = document.getElementById("brand");
+        return {
+            brand: brandInput ? brandInput.value : ""
+        };
+    });
+    setupAutocomplete("ecu", "ecu-results", "ecus", function() {
+        var brandInput = document.getElementById("brand");
+        var modelInput = document.getElementById("model");
+        return {
+            brand: brandInput ? brandInput.value : "",
+            model: modelInput ? modelInput.value : ""
+        };
+    });
+
+    // (ضع هنا بقية كود JS السابق المتعلق بالرفع ومودال الصور والرسائل)
+});
 </script>';
+
 
 // Incluir plantilla
 include __DIR__ . '/includes/layout.php';
