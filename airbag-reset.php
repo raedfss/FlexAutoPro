@@ -11,7 +11,7 @@ if (!isset($_SESSION['email'])) {
 }
 
 // Variables de usuario
-$username = $_SESSION['username'] ?? '';
+$username = isset($_SESSION['username']) ? $_SESSION['username'] : '';
 $user_type = $_SESSION['user_role'] ?? 'user';
 $email = $_SESSION['email'] ?? '';
 
