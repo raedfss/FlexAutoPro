@@ -1273,6 +1273,13 @@ echo '<h1>' . $display_title . '</h1>';
 echo $message_section;
 
 // Sección de búsqueda
+// التأكد من تهيئة القيم الآمنة قبل استخدامها
+$safe_selected_brand = htmlspecialchars($selected_brand ?? '');
+$safe_selected_model = htmlspecialchars($selected_model ?? '');
+$safe_selected_ecu = htmlspecialchars($selected_ecu ?? '');
+$safe_query = htmlspecialchars($query ?? '');
+
+// Sección de búsqueda
 echo '<div class="search-container">';
 echo '<h2 class="search-title">🔍 ابحث عن بيانات إعادة ضبط الإيرباق</h2>';
 echo '<form method="GET" action="" class="search-form">';
@@ -1281,7 +1288,7 @@ echo '<input type="hidden" name="search" value="1">';
 echo '<div class="form-group">';
 echo '<label for="brand">العلامة التجارية</label>';
 echo '<div class="autocomplete-container">';
-echo '<input type="text" id="brand" name="brand" class="form-control" value="'. $safe_selected_brand .'" placeholder="أدخل العلامة التجارية...">';
+echo '<input type="text" id="brand" name="brand" class="form-control" value="' . $safe_selected_brand . '" placeholder="أدخل العلامة التجارية...">';
 echo '<div id="brand-results" class="autocomplete-results"></div>';
 echo '</div>';
 echo '</div>';
@@ -1289,7 +1296,7 @@ echo '</div>';
 echo '<div class="form-group">';
 echo '<label for="model">الموديل</label>';
 echo '<div class="autocomplete-container">';
-echo '<input type="text" id="model" name="model" class="form-control" value="'. $safe_selected_model .'" placeholder="أدخل الموديل...">';
+echo '<input type="text" id="model" name="model" class="form-control" value="' . $safe_selected_model . '" placeholder="أدخل الموديل...">';
 echo '<div id="model-results" class="autocomplete-results"></div>';
 echo '</div>';
 echo '</div>';
@@ -1297,14 +1304,14 @@ echo '</div>';
 echo '<div class="form-group">';
 echo '<label for="ecu">رقم كمبيوتر الإيرباق</label>';
 echo '<div class="autocomplete-container">';
-echo '<input type="text" id="ecu" name="ecu" class="form-control" value="'. $safe_selected_ecu .'" placeholder="أدخل رقم كمبيوتر الإيرباق...">';
+echo '<input type="text" id="ecu" name="ecu" class="form-control" value="' . $safe_selected_ecu . '" placeholder="أدخل رقم كمبيوتر الإيرباق...">';
 echo '<div id="ecu-results" class="autocomplete-results"></div>';
 echo '</div>';
 echo '</div>';
 
 echo '<div class="form-group full-width">';
 echo '<label for="query">بحث عام (العلامة التجارية، الموديل، الرقم، نوع EEPROM)</label>';
-echo '<input type="text" id="query" name="query" class="form-control" value="'. $safe_query .'" placeholder="أدخل كلمات البحث...">';
+echo '<input type="text" id="query" name="query" class="form-control" value="' . $safe_query . '" placeholder="أدخل كلمات البحث...">';
 echo '</div>';
 
 echo '<div class="search-actions full-width">';
@@ -1313,6 +1320,7 @@ echo '<a href="airbag-reset.php" class="btn btn-secondary">↺ إعادة تعي
 echo '</div>';
 echo '</form>';
 echo '</div>';
+
 
 // Mensaje de búsqueda
 if (!empty($search_message)) {
