@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 require_once __DIR__ . '/includes/db.php';
@@ -22,11 +23,127 @@ $selected_brand = $_GET['brand'] ?? '';
 $selected_model = $_GET['model'] ?? '';
 $selected_ecu = $_GET['ecu'] ?? '';
 
+// رسائل النجاح والخطأ
+$success_message = '';
+$error_message = '';
+
 // نتائج البحث
 $ecu_data = null;
 $has_result = false;
 $search_message = '';
 $search_results = [];
+
+// معالجة تحميل ملف الدامب
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['upload_dump'])) {
+    $ecu_id = (int)$_POST['ecu_id'];
+    
+    // التحقق من وجود الملف
+    if (!isset($_FILES['dump_file']) || $_FILES['dump_file']['error'] !== UPLOAD_ERR_OK) {
+        $error_message = 'حدث خطأ أثناء تحميل الملف. يرجى المحاولة مرة أخرى.';
+    } else {
+        // التحقق من نوع الملف
+        $file_info = pathinfo($_FILES['dump_file']['name']);
+        $file_ext = strtolower($file_info['extension']);
+        $allowed_extensions = ['bin', 'hex', 'dump', 'rom', 'dat', 'img', 'eep', 'srec', 'zip'];
+        
+        // التحقق من حجم الملف (5MB كحد أقصى)
+        $max_size = 5 * 1024 * 1024; // 5 ميجابايت
+        
+        if (!in_array($file_ext, $allowed_extensions)) {
+            $error_message = 'نوع الملف غير مدعوم. يُسمح فقط بملفات: ' . implode(', ', $allowed_extensions);
+        } elseif ($_FILES['dump_file']['size'] > $max_size) {
+            $error_message = 'حجم الملف كبير جدًا. الحد الأقصى هو 5 ميجابايت.';
+        } else {
+            try {
+                // جلب بيانات ECU
+                $ecu_stmt = $pdo->prepare("SELECT brand, model, ecu_number FROM airbag_ecus WHERE id = ?");
+                $ecu_stmt->execute([$ecu_id]);
+                $ecu_info = $ecu_stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$ecu_info) {
+                    throw new Exception("لم يتم العثور على معلومات ECU");
+                }
+                
+                // إنشاء دليل للتخزين إذا لم يكن موجودًا
+                $upload_dir = 'uploads/dump_files';
+                if (!file_exists($upload_dir)) {
+                    mkdir($upload_dir, 0755, true);
+                }
+                
+                // إنشاء اسم ملف فريد
+                $new_filename = $username . '_' . date('Ymd_His') . '_' . $ecu_id . '.' . $file_ext;
+                $upload_path = $upload_dir . '/' . $new_filename;
+                
+                // نقل الملف المؤقت إلى المجلد المطلوب
+                if (move_uploaded_file($_FILES['dump_file']['tmp_name'], $upload_path)) {
+                    $dump_type = $_POST['dump_type'] ?? 'eeprom';
+                    $notes = $_POST['notes'] ?? '';
+                    
+                    // حفظ معلومات الملف في قاعدة البيانات
+                    $dump_stmt = $pdo->prepare("
+                        INSERT INTO ecu_dumps (
+                            ecu_id, username, filename, original_filename, file_path, 
+                            dump_type, notes, file_size, file_type, upload_date
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                    ");
+                    
+                    $dump_stmt->execute([
+                        $ecu_id,
+                        $username,
+                        $new_filename,
+                        $_FILES['dump_file']['name'],
+                        $upload_path,
+                        $dump_type,
+                        $notes,
+                        $_FILES['dump_file']['size'],
+                        $file_ext
+                    ]);
+                    
+                    // إنشاء تذكرة جديدة
+                    $ticket_stmt = $pdo->prepare("
+                        INSERT INTO tickets (
+                            username, email, phone, car_type, chassis, service_type, 
+                            description, created_at, status, is_seen
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), 'pending', 0)
+                    ");
+                    
+                    $phone = $_POST['phone'] ?? '';
+                    $chassis = $_POST['chassis'] ?? '';
+                    
+                    $service_type = 'إعادة ضبط الإيرباق';
+                    $car_type = $ecu_info['brand'] . ' ' . $ecu_info['model'];
+                    $description = 'طلب إعادة ضبط كمبيوتر إيرباق. رقم الكمبيوتر: ' . $ecu_info['ecu_number'] . 
+                                   '. نوع الدامب: ' . $dump_type . '. ملاحظات: ' . $notes;
+                    
+                    $ticket_stmt->execute([
+                        $username,
+                        $email,
+                        $phone,
+                        $car_type,
+                        $chassis,
+                        $service_type,
+                        $description
+                    ]);
+                    
+                    $ticket_id = $pdo->lastInsertId();
+                    
+                    // ربط التذكرة بالملف
+                    $link_stmt = $pdo->prepare("
+                        UPDATE ecu_dumps SET ticket_id = ? WHERE filename = ?
+                    ");
+                    $link_stmt->execute([$ticket_id, $new_filename]);
+                    
+                    $success_message = 'تم تحميل الملف وإنشاء تذكرة بنجاح. يمكنك متابعة حالة الطلب في صفحة "تذاكري".';
+                } else {
+                    throw new Exception("فشل في نقل الملف المرفوع");
+                }
+            } catch (Exception $e) {
+                $error_message = 'حدث خطأ أثناء معالجة الطلب: ' . $e->getMessage();
+                error_log('Error in airbag-reset.php: ' . $e->getMessage());
+            }
+        }
+    }
+}
 
 // معالجة البحث المباشر
 if (!empty($_GET['ecu_id'])) {
@@ -132,6 +249,20 @@ if (!empty($_GET['search']) && (
     }
 }
 
+// التحقق من وجود طلبات سابقة لهذا ECU
+$user_dump_requests = [];
+if ($has_result && !empty($ecu_data)) {
+    $dump_stmt = $pdo->prepare("
+        SELECT ed.*, t.status as ticket_status, t.is_seen
+        FROM ecu_dumps ed
+        LEFT JOIN tickets t ON ed.ticket_id = t.id
+        WHERE ed.ecu_id = ? AND ed.username = ?
+        ORDER BY ed.upload_date DESC
+    ");
+    $dump_stmt->execute([$ecu_data['id'], $username]);
+    $user_dump_requests = $dump_stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 // جلب العلامات التجارية للفلتر
 try {
     $brands = $pdo->query("SELECT DISTINCT brand FROM airbag_ecus ORDER BY brand")->fetchAll(PDO::FETCH_COLUMN);
@@ -184,6 +315,30 @@ $page_css = <<<CSS
   box-shadow: 0 0 40px rgba(0, 200, 255, 0.15);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(66, 135, 245, 0.25);
+}
+
+.message-container {
+  margin-bottom: 20px;
+}
+
+.success-message {
+  background-color: rgba(39, 174, 96, 0.2);
+  color: #2ecc71;
+  border: 1px solid rgba(39, 174, 96, 0.4);
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.error-message {
+  background-color: rgba(231, 76, 60, 0.2);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.4);
+  border-radius: 8px;
+  padding: 15px;
+  text-align: center;
+  margin-bottom: 20px;
 }
 
 .search-container {
@@ -274,6 +429,16 @@ $page_css = <<<CSS
   transform: translateY(-2px);
 }
 
+.btn-success {
+  background: linear-gradient(145deg, #28a745, #218838);
+  color: white;
+}
+
+.btn-success:hover {
+  background: linear-gradient(145deg, #34ce57, #28a745);
+  transform: translateY(-2px);
+}
+
 .result-container {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 12px;
@@ -334,6 +499,110 @@ $page_css = <<<CSS
   color: #a8d8ff;
 }
 
+.upload-form {
+  background: rgba(0, 123, 255, 0.1);
+  border: 1px solid rgba(0, 123, 255, 0.3);
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 25px;
+  text-align: right;
+}
+
+.upload-title {
+  color: #00d4ff;
+  margin-bottom: 15px;
+  text-align: center;
+  font-size: 1.3em;
+}
+
+.file-upload-container {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.file-input-wrapper {
+  position: relative;
+  margin-bottom: 15px;
+  text-align: center;
+}
+
+.file-input {
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.file-input-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px dashed rgba(66, 135, 245, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.file-input-label:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: #00d4ff;
+}
+
+.file-input-icon {
+  font-size: 3em;
+  color: #00d4ff;
+  margin-bottom: 10px;
+}
+
+.file-selected {
+  display: none;
+  margin-top: 10px;
+  color: #00d4ff;
+}
+
+.upload-form-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.file-type-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin: 15px 0;
+}
+
+.file-type-option {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(66, 135, 245, 0.3);
+  padding: 8px 15px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.file-type-option.selected {
+  background: rgba(0, 123, 255, 0.2);
+  border-color: #00d4ff;
+  color: #00d4ff;
+}
+
+.file-type-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .alert {
   padding: 15px;
   border-radius: 10px;
@@ -352,6 +621,12 @@ $page_css = <<<CSS
   background: rgba(255, 193, 7, 0.2);
   border: 1px solid #ffc107;
   color: #ffe699;
+}
+
+.alert-success {
+  background: rgba(40, 167, 69, 0.2);
+  border: 1px solid #28a745;
+  color: #beffdc;
 }
 
 .image-container {
@@ -504,6 +779,63 @@ $page_css = <<<CSS
   background: rgba(66, 135, 245, 0.3);
 }
 
+.previous-uploads {
+  margin-top: 25px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  text-align: right;
+}
+
+.previous-uploads-title {
+  color: #00d4ff;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.previous-uploads-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.previous-uploads-table th, 
+.previous-uploads-table td {
+  padding: 10px;
+  text-align: right;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.previous-uploads-table th {
+  background: rgba(0, 0, 0, 0.2);
+  color: #00d4ff;
+}
+
+.ticket-status {
+  padding: 5px 10px;
+  border-radius: 15px;
+  font-size: 0.85em;
+  display: inline-block;
+}
+
+.status-pending {
+  background-color: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.status-reviewed {
+  background-color: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.status-cancelled {
+  background-color: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
 /* تخطيط متجاوب */
 @media (min-width: 768px) {
   .search-form {
@@ -536,6 +868,10 @@ $page_css = <<<CSS
   .image-container {
     grid-template-columns: 1fr;
   }
+  
+  .upload-form-buttons {
+    flex-direction: column;
+  }
 }
 
 .back-link {
@@ -561,6 +897,18 @@ ob_start();
 
 <div class="main-container">
   <h1><?= $display_title ?></h1>
+  
+  <?php if ($success_message): ?>
+    <div class="success-message">
+      <i class="fas fa-check-circle"></i> <?= htmlspecialchars($success_message) ?>
+    </div>
+  <?php endif; ?>
+  
+  <?php if ($error_message): ?>
+    <div class="error-message">
+      <i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error_message) ?>
+    </div>
+  <?php endif; ?>
   
   <!-- قسم البحث -->
   <div class="search-container">
@@ -721,6 +1069,113 @@ ob_start();
           استخدم هذه المعلومات على مسؤوليتك الخاصة وتأكد من عمل نسخة احتياطية قبل أي تعديل.
         </p>
       </div>
+
+      <!-- طلبات الفحص السابقة -->
+      <?php if (!empty($user_dump_requests)): ?>
+        <div class="previous-uploads">
+          <h3 class="previous-uploads-title">📄 طلباتك السابقة لهذا الكمبيوتر</h3>
+          <table class="previous-uploads-table">
+            <thead>
+              <tr>
+                <th>تاريخ الطلب</th>
+                <th>نوع الملف</th>
+                <th>اسم الملف</th>
+                <th>حالة الطلب</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($user_dump_requests as $request): ?>
+                <tr>
+                  <td><?= date('Y/m/d H:i', strtotime($request['upload_date'])) ?></td>
+                  <td>
+                    <?php
+                    switch($request['dump_type']) {
+                      case 'eeprom': echo 'ذاكرة EEPROM'; break;
+                      case 'flash': echo 'ذاكرة الفلاش'; break;
+                      case 'cpu': echo 'وحدة المعالجة'; break;
+                      default: echo htmlspecialchars($request['dump_type']);
+                    }
+                    ?>
+                  </td>
+                  <td><?= htmlspecialchars($request['original_filename']) ?></td>
+                  <td>
+                    <?php if ($request['ticket_status'] === 'cancelled'): ?>
+                      <span class="ticket-status status-cancelled">ملغي</span>
+                    <?php elseif (isset($request['is_seen']) && $request['is_seen']): ?>
+                      <span class="ticket-status status-reviewed">تمت المراجعة</span>
+                    <?php else: ?>
+                      <span class="ticket-status status-pending">قيد المراجعة</span>
+                    <?php endif; ?>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+          <div style="text-align: center; margin-top: 15px;">
+            <a href="includes/my_tickets.php" class="btn btn-primary">
+              <i class="fas fa-ticket-alt"></i> عرض جميع تذاكري
+            </a>
+          </div>
+        </div>
+      <?php endif; ?>
+
+      <!-- نموذج تحميل الملف -->
+      <div class="upload-form">
+        <h3 class="upload-title">📤 تحميل ملف الدامب لإعادة ضبط الإيرباق</h3>
+        
+        <form method="POST" enctype="multipart/form-data">
+          <input type="hidden" name="upload_dump" value="1">
+          <input type="hidden" name="ecu_id" value="<?= $ecu_data['id'] ?>">
+          
+          <div class="file-input-wrapper">
+            <input type="file" id="dump_file" name="dump_file" class="file-input" accept=".bin,.hex,.dump,.rom,.dat,.img,.eep,.srec,.zip" required>
+            <label for="dump_file" class="file-input-label">
+              <div class="file-input-icon">
+                <i class="fas fa-file-upload"></i>
+              </div>
+              <div>اضغط هنا لتحميل ملف الدامب</div>
+              <div style="font-size: 0.8em; color: #a8d8ff; margin-top: 5px;">
+                الملفات المدعومة: .bin, .hex, .dump, .rom, .dat, .img, .eep, .srec, .zip
+              </div>
+            </label>
+            <div id="file-selected" class="file-selected">تم اختيار: <span id="file-name"></span></div>
+          </div>
+          
+          <div class="form-group">
+            <label>نوع الدامب:</label>
+            <div class="file-type-selector">
+              <div class="file-type-option selected" data-value="eeprom">ذاكرة EEPROM</div>
+              <div class="file-type-option" data-value="flash">ذاكرة الفلاش</div>
+              <div class="file-type-option" data-value="cpu">وحدة المعالجة CPU</div>
+            </div>
+            <input type="hidden" name="dump_type" id="dump_type" value="eeprom">
+          </div>
+          
+          <div class="form-group">
+            <label for="chassis">رقم الشاصي (الهيكل):</label>
+            <input type="text" id="chassis" name="chassis" class="form-control" placeholder="أدخل رقم شاصي السيارة...">
+          </div>
+          
+          <div class="form-group">
+            <label for="phone">رقم الهاتف:</label>
+            <input type="text" id="phone" name="phone" class="form-control" placeholder="رقم هاتفك للتواصل..." required>
+          </div>
+          
+          <div class="form-group">
+            <label for="notes">ملاحظات إضافية:</label>
+            <textarea id="notes" name="notes" class="form-control" rows="3" placeholder="أي ملاحظات أو معلومات إضافية ترغب في إضافتها..."></textarea>
+          </div>
+          
+          <div class="upload-form-buttons">
+            <button type="submit" class="btn btn-success">
+              <i class="fas fa-paper-plane"></i> إرسال الطلب
+            </button>
+            <button type="reset" class="btn btn-secondary">
+              <i class="fas fa-undo"></i> إعادة تعيين
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   <?php elseif (!isset($search_results) || count($search_results) === 0): ?>
     <!-- معلومات افتراضية إذا لم تكن هناك نتائج بحث -->
@@ -731,8 +1186,14 @@ ob_start();
         يمكنك البحث عن طريق العلامة التجارية أو الموديل أو رقم الكمبيوتر.
       </p>
       <p style="margin-top: 10px;">
-        بمجرد العثور على الكمبيوتر المطلوب، ستتمكن من رؤية صور المخطط وتعليمات إعادة الضبط.
+        بمجرد العثور على الكمبيوتر المطلوب، ستتمكن من:
       </p>
+      <ul style="text-align: right; padding-right: 20px; margin-top: 10px; color: #a8d8ff;">
+        <li>رؤية صور المخطط وتعليمات إعادة الضبط</li>
+        <li>تحميل ملف الدامب الخاص بكمبيوتر السيارة</li>
+        <li>إرسال طلب إعادة ضبط للفريق الفني</li>
+        <li>متابعة حالة طلبك في قسم "تذاكري"</li>
+      </ul>
     </div>
   <?php endif; ?>
   
@@ -769,6 +1230,68 @@ document.addEventListener("DOMContentLoaded", function() {
       model: document.getElementById("model").value
     };
   });
+  
+  // تهيئة محدد نوع الملف
+  const fileTypeOptions = document.querySelectorAll('.file-type-option');
+  const fileTypeInput = document.getElementById('dump_type');
+  
+  fileTypeOptions.forEach(option => {
+    option.addEventListener('click', function() {
+      // إزالة الفئة selected من جميع الخيارات
+      fileTypeOptions.forEach(opt => opt.classList.remove('selected'));
+      
+      // إضافة الفئة selected للخيار المختار
+      this.classList.add('selected');
+      
+      // تحديث قيمة الحقل المخفي
+      fileTypeInput.value = this.getAttribute('data-value');
+    });
+  });
+  
+  // معالجة تحديد الملف
+  const fileInput = document.getElementById('dump_file');
+  const fileSelected = document.getElementById('file-selected');
+  const fileName = document.getElementById('file-name');
+  
+  fileInput.addEventListener('change', function() {
+    if (this.files.length > 0) {
+      fileName.textContent = this.files[0].name;
+      fileSelected.style.display = 'block';
+      
+      // التحقق من حجم الملف
+      const fileSize = this.files[0].size;
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      
+      if (fileSize > maxSize) {
+        alert('حجم الملف كبير جدًا. الحد الأقصى هو 5 ميجابايت.');
+        this.value = ''; // إعادة تعيين الملف
+        fileSelected.style.display = 'none';
+      }
+      
+      // التحقق من نوع الملف
+      const fileExt = this.files[0].name.split('.').pop().toLowerCase();
+      const allowedExtensions = ['bin', 'hex', 'dump', 'rom', 'dat', 'img', 'eep', 'srec', 'zip'];
+      
+      if (!allowedExtensions.includes(fileExt)) {
+        alert('نوع الملف غير مدعوم. يُسمح فقط بملفات: ' + allowedExtensions.join(', '));
+        this.value = ''; // إعادة تعيين الملف
+        fileSelected.style.display = 'none';
+      }
+    } else {
+      fileSelected.style.display = 'none';
+    }
+  });
+  
+  // إخفاء رسائل النجاح/الخطأ بعد 5 ثوانٍ
+  const successMessage = document.querySelector('.success-message');
+  const errorMessage = document.querySelector('.error-message');
+  
+  if (successMessage || errorMessage) {
+    setTimeout(function() {
+      if (successMessage) successMessage.style.display = 'none';
+      if (errorMessage) errorMessage.style.display = 'none';
+    }, 5000);
+  }
 });
 
 // دالة إعداد الإكمال التلقائي
