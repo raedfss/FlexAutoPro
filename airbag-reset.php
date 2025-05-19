@@ -10,39 +10,43 @@
  * @copyright   2025 FlexAutoPro
  */
 
-// مهم جدًا: تأكد من عدم وجود مسافات أو أحرف قبل علامة <?php الافتتاحية
+// Iniciamos buffer de salida antes de cualquier otra operación
+ob_start();
 
-// تهيئة الجلسة قبل أي مخرجات
+// Iniciamos sesión
 session_start();
+
+// Conectamos a la base de datos
 require_once __DIR__ . '/includes/db.php';
 
-// التحقق من تسجيل الدخول
+// Verificamos la autenticación
 if (!isset($_SESSION['email'])) {
     header("Location: login.php");
     exit;
 }
 
+// Variables de usuario
 $username = $_SESSION['username'] ?? 'العميل';
 $user_role = $_SESSION['user_role'] ?? 'customer';
 $email = $_SESSION['email'] ?? '';
 
-// إعداد عنوان الصفحة
+// Configuración de la página
 $page_title = 'مسح وإعادة ضبط بيانات الإيرباق';
 $display_title = 'نظام مسح وإعادة ضبط الإيرباق';
 
-// متغيرات البحث
+// Variables de búsqueda
 $query = $_GET['query'] ?? '';
 $selected_brand = $_GET['brand'] ?? '';
 $selected_model = $_GET['model'] ?? '';
 $selected_ecu = $_GET['ecu'] ?? '';
 
-// نتائج البحث
+// Resultados de búsqueda
 $ecu_data = null;
 $has_result = false;
 $search_message = '';
 $search_results = [];
 
-// معالجة البحث المباشر
+// Procesamiento de búsqueda directa por ID
 if (!empty($_GET['ecu_id'])) {
     $ecu_id = (int)$_GET['ecu_id'];
     
@@ -58,7 +62,7 @@ if (!empty($_GET['ecu_id'])) {
     if ($ecu_data) {
         $has_result = true;
         
-        // جلب الصور إذا كانت متوفرة
+        // Obtener imágenes si existen
         if ($ecu_data['image_count'] > 0) {
             $images_stmt = $pdo->prepare("
                 SELECT * FROM ecu_images WHERE ecu_id = ? ORDER BY display_order ASC
@@ -69,7 +73,7 @@ if (!empty($_GET['ecu_id'])) {
     }
 }
 
-// معالجة البحث عن طريق النموذج
+// Procesamiento de búsqueda por formulario
 if (!empty($_GET['search']) && (
     !empty($selected_brand) || 
     !empty($selected_model) || 
@@ -124,11 +128,11 @@ if (!empty($_GET['search']) && (
         $search_results = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
         if (count($search_results) === 1) {
-            // إذا وجدنا نتيجة واحدة فقط، عرضها مباشرة
+            // Si solo hay un resultado, mostrarlo directamente
             $ecu_data = $search_results[0];
             $has_result = true;
             
-            // جلب الصور إذا كانت متوفرة
+            // Obtener imágenes si existen
             if ($ecu_data['image_count'] > 0) {
                 $images_stmt = $pdo->prepare("
                     SELECT * FROM ecu_images WHERE ecu_id = ? ORDER BY display_order ASC
@@ -137,22 +141,22 @@ if (!empty($_GET['search']) && (
                 $ecu_data['images'] = $images_stmt->fetchAll(PDO::FETCH_ASSOC);
             }
         } elseif (count($search_results) > 1) {
-            // إذا وجدنا أكثر من نتيجة، عرض قائمة للاختيار
+            // Si hay múltiples resultados, mostrar lista para seleccionar
             $search_message = 'تم العثور على ' . count($search_results) . ' نتيجة، اختر واحدة:';
         } else {
-            // لا توجد نتائج
+            // No hay resultados
             $search_message = 'لم يتم العثور على نتائج مطابقة، حاول مرة أخرى.';
         }
     }
 }
 
-// جلب العلامات التجارية للفلتر
+// Obtener marcas para filtros
 $brands = $pdo->query("SELECT DISTINCT brand FROM airbag_ecus ORDER BY brand")->fetchAll(PDO::FETCH_COLUMN);
 
-// إضافة تسجيل للبحث (إذا كنت تريد تتبع عمليات البحث)
+// Registrar búsqueda (opcional)
 if ($has_result && !empty($ecu_data)) {
     try {
-        // تحقق من وجود جدول السجلات أولاً
+        // Verificar si la tabla existe
         $check_table = $pdo->query("SHOW TABLES LIKE 'search_logs'");
         if ($check_table->rowCount() > 0) {
             $log_stmt = $pdo->prepare("
@@ -175,12 +179,12 @@ if ($has_result && !empty($ecu_data)) {
             ]);
         }
     } catch (Exception $e) {
-        // لا نقوم بعرض أخطاء السجل للمستخدم
+        // No mostrar errores de registro al usuario
         error_log('Error logging search: ' . $e->getMessage());
     }
 }
 
-// CSS مخصص للصفحة
+// CSS personalizado
 $page_css = <<<CSS
 .main-container {
   background: rgba(0, 0, 0, 0.7);
@@ -548,11 +552,10 @@ $page_css = <<<CSS
 }
 CSS;
 
-// محتوى الصفحة
-ob_start();
-?>
+// Contenido de la página
+$page_content = '
 <div class="main-container">
-  <h1><?= $display_title ?></h1>
+  <h1>'.$display_title.'</h1>
   
   <!-- قسم البحث -->
   <div class="search-container">
@@ -564,7 +567,7 @@ ob_start();
       <div class="form-group">
         <label for="brand">العلامة التجارية</label>
         <div class="autocomplete-container">
-          <input type="text" id="brand" name="brand" class="form-control" value="<?= htmlspecialchars($selected_brand) ?>" placeholder="أدخل العلامة التجارية...">
+          <input type="text" id="brand" name="brand" class="form-control" value="'.htmlspecialchars($selected_brand).'" placeholder="أدخل العلامة التجارية...">
           <div id="brand-results" class="autocomplete-results"></div>
         </div>
       </div>
@@ -572,7 +575,7 @@ ob_start();
       <div class="form-group">
         <label for="model">الموديل</label>
         <div class="autocomplete-container">
-          <input type="text" id="model" name="model" class="form-control" value="<?= htmlspecialchars($selected_model) ?>" placeholder="أدخل الموديل...">
+          <input type="text" id="model" name="model" class="form-control" value="'.htmlspecialchars($selected_model).'" placeholder="أدخل الموديل...">
           <div id="model-results" class="autocomplete-results"></div>
         </div>
       </div>
@@ -580,14 +583,14 @@ ob_start();
       <div class="form-group">
         <label for="ecu">رقم كمبيوتر الإيرباق</label>
         <div class="autocomplete-container">
-          <input type="text" id="ecu" name="ecu" class="form-control" value="<?= htmlspecialchars($selected_ecu) ?>" placeholder="أدخل رقم كمبيوتر الإيرباق...">
+          <input type="text" id="ecu" name="ecu" class="form-control" value="'.htmlspecialchars($selected_ecu).'" placeholder="أدخل رقم كمبيوتر الإيرباق...">
           <div id="ecu-results" class="autocomplete-results"></div>
         </div>
       </div>
       
       <div class="form-group full-width">
         <label for="query">بحث عام (العلامة التجارية، الموديل، الرقم، نوع EEPROM)</label>
-        <input type="text" id="query" name="query" class="form-control" value="<?= htmlspecialchars($query) ?>" placeholder="أدخل كلمات البحث...">
+        <input type="text" id="query" name="query" class="form-control" value="'.htmlspecialchars($query).'" placeholder="أدخل كلمات البحث...">
       </div>
       
       <div class="search-actions full-width">
@@ -595,46 +598,53 @@ ob_start();
         <a href="airbag-reset.php" class="btn btn-secondary">↺ إعادة تعيين</a>
       </div>
     </form>
-  </div>
+  </div>';
   
-  <?php if (!empty($search_message)): ?>
+if (!empty($search_message)) {
+    $page_content .= '
     <div class="alert alert-info">
-      <?= htmlspecialchars($search_message) ?>
-    </div>
+      '.htmlspecialchars($search_message).'
+    </div>';
     
-    <?php if (isset($search_results) && count($search_results) > 0): ?>
-      <div class="search-results">
-        <table>
-          <thead>
-            <tr>
-              <th>العلامة التجارية</th>
-              <th>الموديل</th>
-              <th>رقم الكمبيوتر</th>
-              <th>نوع EEPROM</th>
-              <th>الإجراء</th>
-            </tr>
-          </thead>
-          <tbody>
-            <?php foreach ($search_results as $result): ?>
+    if (isset($search_results) && count($search_results) > 0) {
+        $page_content .= '
+        <div class="search-results">
+          <table>
+            <thead>
               <tr>
-                <td><?= htmlspecialchars($result['brand']) ?></td>
-                <td><?= htmlspecialchars($result['model']) ?></td>
-                <td><?= htmlspecialchars($result['ecu_number']) ?></td>
-                <td><?= htmlspecialchars($result['eeprom_type'] ?? 'غير متوفر') ?></td>
-                <td>
-                  <a href="airbag-reset.php?ecu_id=<?= $result['id'] ?>" class="result-link">
-                    عرض التفاصيل
-                  </a>
-                </td>
+                <th>العلامة التجارية</th>
+                <th>الموديل</th>
+                <th>رقم الكمبيوتر</th>
+                <th>نوع EEPROM</th>
+                <th>الإجراء</th>
               </tr>
-            <?php endforeach; ?>
-          </tbody>
-        </table>
-      </div>
-    <?php endif; ?>
-  <?php endif; ?>
+            </thead>
+            <tbody>';
+            
+        foreach ($search_results as $result) {
+            $page_content .= '
+                <tr>
+                  <td>'.htmlspecialchars($result['brand']).'</td>
+                  <td>'.htmlspecialchars($result['model']).'</td>
+                  <td>'.htmlspecialchars($result['ecu_number']).'</td>
+                  <td>'.htmlspecialchars($result['eeprom_type'] ?? 'غير متوفر').'</td>
+                  <td>
+                    <a href="airbag-reset.php?ecu_id='.$result['id'].'" class="result-link">
+                      عرض التفاصيل
+                    </a>
+                  </td>
+                </tr>';
+        }
+            
+        $page_content .= '
+            </tbody>
+          </table>
+        </div>';
+    }
+}
   
-  <?php if ($has_result && !empty($ecu_data)): ?>
+if ($has_result && !empty($ecu_data)) {
+    $page_content .= '
     <!-- عرض نتائج البحث -->
     <div class="result-container">
       <h2 class="result-title">🚗 بيانات كمبيوتر الإيرباق</h2>
@@ -642,56 +652,69 @@ ob_start();
       <table class="data-table">
         <tr>
           <th>العلامة التجارية:</th>
-          <td><?= htmlspecialchars($ecu_data['brand']) ?></td>
+          <td>'.htmlspecialchars($ecu_data['brand']).'</td>
         </tr>
         <tr>
           <th>الموديل:</th>
-          <td><?= htmlspecialchars($ecu_data['model']) ?></td>
+          <td>'.htmlspecialchars($ecu_data['model']).'</td>
         </tr>
         <tr>
           <th>رقم كمبيوتر الإيرباق:</th>
-          <td><?= htmlspecialchars($ecu_data['ecu_number']) ?></td>
-        </tr>
-        <?php if (!empty($ecu_data['eeprom_type'])): ?>
+          <td>'.htmlspecialchars($ecu_data['ecu_number']).'</td>
+        </tr>';
+        
+    if (!empty($ecu_data['eeprom_type'])) {
+        $page_content .= '
         <tr>
           <th>نوع EEPROM:</th>
-          <td><?= htmlspecialchars($ecu_data['eeprom_type']) ?></td>
-        </tr>
-        <?php endif; ?>
-        <?php if (isset($ecu_data['crash_location']) && !empty($ecu_data['crash_location'])): ?>
+          <td>'.htmlspecialchars($ecu_data['eeprom_type']).'</td>
+        </tr>';
+    }
+        
+    if (isset($ecu_data['crash_location']) && !empty($ecu_data['crash_location'])) {
+        $page_content .= '
         <tr>
           <th>موقع بيانات الحادث:</th>
-          <td><?= htmlspecialchars($ecu_data['crash_location']) ?></td>
-        </tr>
-        <?php endif; ?>
-        <?php if (isset($ecu_data['reset_procedure']) && !empty($ecu_data['reset_procedure'])): ?>
+          <td>'.htmlspecialchars($ecu_data['crash_location']).'</td>
+        </tr>';
+    }
+        
+    if (isset($ecu_data['reset_procedure']) && !empty($ecu_data['reset_procedure'])) {
+        $page_content .= '
         <tr>
           <th>إجراءات إعادة الضبط:</th>
-          <td><?= nl2br(htmlspecialchars($ecu_data['reset_procedure'])) ?></td>
-        </tr>
-        <?php endif; ?>
-      </table>
+          <td>'.nl2br(htmlspecialchars($ecu_data['reset_procedure'])).'</td>
+        </tr>';
+    }
+    
+    $page_content .= '
+      </table>';
       
-      <?php if (isset($ecu_data['images']) && count($ecu_data['images']) > 0): ?>
+    if (isset($ecu_data['images']) && count($ecu_data['images']) > 0) {
+        $page_content .= '
         <h3 style="color: #00d4ff; margin-top: 20px;">📷 صور مخطط الإيرباق</h3>
-        <div class="image-container">
-          <?php foreach ($ecu_data['images'] as $index => $image): ?>
+        <div class="image-container">';
+          
+        foreach ($ecu_data['images'] as $index => $image) {
+            $page_content .= '
             <div class="ecu-image">
-              <img src="uploads/ecu_images/<?= htmlspecialchars($image['filename']) ?>" 
-                   alt="<?= htmlspecialchars($ecu_data['brand'] . ' ' . $ecu_data['model']) ?>"
-                   onclick="openImageModal('uploads/ecu_images/<?= htmlspecialchars($image['filename']) ?>')">
-              <?php if (isset($image['description']) && !empty($image['description'])): ?>
-                <div class="image-caption"><?= htmlspecialchars($image['description']) ?></div>
-              <?php endif; ?>
-            </div>
-          <?php endforeach; ?>
-        </div>
-      <?php else: ?>
+              <img src="uploads/ecu_images/'.htmlspecialchars($image['filename']).'" 
+                   alt="'.htmlspecialchars($ecu_data['brand'] . ' ' . $ecu_data['model']).'"
+                   onclick="openImageModal(\'uploads/ecu_images/'.htmlspecialchars($image['filename']).'\')">
+              '.(isset($image['description']) && !empty($image['description']) ? '<div class="image-caption">'.htmlspecialchars($image['description']).'</div>' : '').'
+            </div>';
+        }
+          
+        $page_content .= '
+        </div>';
+    } else {
+        $page_content .= '
         <div class="alert alert-warning">
           لا توجد صور متاحة لهذا الكمبيوتر
-        </div>
-      <?php endif; ?>
+        </div>';
+    }
       
+    $page_content .= '
       <div class="instructions">
         <h3 style="color: #00d4ff;">📋 تعليمات إعادة ضبط الإيرباق</h3>
         <ol>
@@ -713,8 +736,9 @@ ob_start();
           استخدم هذه المعلومات على مسؤوليتك الخاصة وتأكد من عمل نسخة احتياطية قبل أي تعديل.
         </p>
       </div>
-    </div>
-  <?php elseif (!isset($search_results) || count($search_results) === 0): ?>
+    </div>';
+} elseif (!isset($search_results) || count($search_results) === 0) {
+    $page_content .= '
     <!-- معلومات افتراضية إذا لم تكن هناك نتائج بحث -->
     <div class="info-box">
       <h3>👋 مرحبًا بك في نظام مسح وإعادة ضبط الإيرباق</h3>
@@ -725,8 +749,10 @@ ob_start();
       <p style="margin-top: 10px;">
         بمجرد العثور على الكمبيوتر المطلوب، ستتمكن من رؤية صور المخطط وتعليمات إعادة الضبط.
       </p>
-    </div>
-  <?php endif; ?>
+    </div>';
+}
+
+$page_content .= '
 </div>
 
 <!-- مودال عرض الصور -->
@@ -738,22 +764,22 @@ ob_start();
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener("DOMContentLoaded", function() {
   // الإكمال التلقائي للماركة
-  setupAutocomplete('brand', 'brand-results', 'brands');
+  setupAutocomplete("brand", "brand-results", "brands");
   
   // الإكمال التلقائي للموديل
-  setupAutocomplete('model', 'model-results', 'models', function() {
+  setupAutocomplete("model", "model-results", "models", function() {
     return {
-      brand: document.getElementById('brand').value
+      brand: document.getElementById("brand").value
     };
   });
   
   // الإكمال التلقائي لرقم الكمبيوتر
-  setupAutocomplete('ecu', 'ecu-results', 'ecus', function() {
+  setupAutocomplete("ecu", "ecu-results", "ecus", function() {
     return {
-      brand: document.getElementById('brand').value,
-      model: document.getElementById('model').value
+      brand: document.getElementById("brand").value,
+      model: document.getElementById("model").value
     };
   });
 });
@@ -766,26 +792,26 @@ function setupAutocomplete(inputId, resultsId, action, paramsCallback) {
   let selectedIndex = -1;
   let items = [];
   
-  input.addEventListener('input', function() {
+  input.addEventListener("input", function() {
     const query = this.value.trim();
     if (query.length < 1) {
-      resultsContainer.style.display = 'none';
+      resultsContainer.style.display = "none";
       return;
     }
     
     // بناء المعلمات الإضافية
-    let extraParams = '';
+    let extraParams = "";
     if (paramsCallback) {
       const params = paramsCallback();
       for (const key in params) {
         if (params[key]) {
-          extraParams += `&${key}=${encodeURIComponent(params[key])}`;
+          extraParams += "&" + key + "=" + encodeURIComponent(params[key]);
         }
       }
     }
     
     // إجراء طلب الإكمال التلقائي
-    fetch(`search_airbag_ecus.php?action=${action}&q=${encodeURIComponent(query)}${extraParams}`)
+    fetch("search_airbag_ecus.php?action=" + action + "&q=" + encodeURIComponent(query) + extraParams)
       .then(response => response.json())
       .then(data => {
         if (data.error) {
@@ -796,58 +822,58 @@ function setupAutocomplete(inputId, resultsId, action, paramsCallback) {
         items = data;
         
         if (items.length === 0) {
-          resultsContainer.style.display = 'none';
+          resultsContainer.style.display = "none";
           return;
         }
         
         // عرض النتائج
-        resultsContainer.innerHTML = '';
+        resultsContainer.innerHTML = "";
         items.forEach((item, index) => {
-          const div = document.createElement('div');
-          div.className = 'autocomplete-item';
+          const div = document.createElement("div");
+          div.className = "autocomplete-item";
           div.textContent = item;
-          div.addEventListener('click', function() {
+          div.addEventListener("click", function() {
             input.value = item;
-            resultsContainer.style.display = 'none';
+            resultsContainer.style.display = "none";
           });
           resultsContainer.appendChild(div);
         });
         
-        resultsContainer.style.display = 'block';
+        resultsContainer.style.display = "block";
         selectedIndex = -1;
       })
       .catch(error => {
-        console.error('Error fetching autocomplete results:', error);
+        console.error("Error fetching autocomplete results:", error);
       });
   });
   
   // التنقل في القائمة باستخدام لوحة المفاتيح
-  input.addEventListener('keydown', function(e) {
-    const itemElements = resultsContainer.querySelectorAll('.autocomplete-item');
+  input.addEventListener("keydown", function(e) {
+    const itemElements = resultsContainer.querySelectorAll(".autocomplete-item");
     
     if (itemElements.length === 0) return;
     
     // السهم لأسفل
-    if (e.key === 'ArrowDown') {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       selectedIndex = (selectedIndex + 1) % itemElements.length;
       updateSelectedItem(itemElements);
     }
     // السهم لأعلى
-    else if (e.key === 'ArrowUp') {
+    else if (e.key === "ArrowUp") {
       e.preventDefault();
       selectedIndex = (selectedIndex - 1 + itemElements.length) % itemElements.length;
       updateSelectedItem(itemElements);
     }
     // Enter
-    else if (e.key === 'Enter' && selectedIndex !== -1) {
+    else if (e.key === "Enter" && selectedIndex !== -1) {
       e.preventDefault();
       input.value = items[selectedIndex];
-      resultsContainer.style.display = 'none';
+      resultsContainer.style.display = "none";
     }
     // Escape
-    else if (e.key === 'Escape') {
-      resultsContainer.style.display = 'none';
+    else if (e.key === "Escape") {
+      resultsContainer.style.display = "none";
     }
   });
   
@@ -855,46 +881,43 @@ function setupAutocomplete(inputId, resultsId, action, paramsCallback) {
   function updateSelectedItem(itemElements) {
     itemElements.forEach((item, index) => {
       if (index === selectedIndex) {
-        item.classList.add('selected');
-        item.scrollIntoView({ block: 'nearest' });
+        item.classList.add("selected");
+        item.scrollIntoView({ block: "nearest" });
       } else {
-        item.classList.remove('selected');
+        item.classList.remove("selected");
       }
     });
   }
   
   // إخفاء القائمة عند النقر في مكان آخر
-  document.addEventListener('click', function(e) {
+  document.addEventListener("click", function(e) {
     if (e.target !== input && e.target !== resultsContainer) {
-      resultsContainer.style.display = 'none';
+      resultsContainer.style.display = "none";
     }
   });
 }
 
 // دوال عرض الصور
 function openImageModal(src) {
-  const modal = document.getElementById('imageModal');
-  const modalImg = document.getElementById('modalImage');
-  modal.style.display = 'block';
+  const modal = document.getElementById("imageModal");
+  const modalImg = document.getElementById("modalImage");
+  modal.style.display = "block";
   modalImg.src = src;
 }
 
 function closeImageModal() {
-  document.getElementById('imageModal').style.display = 'none';
+  document.getElementById("imageModal").style.display = "none";
 }
 
 // إغلاق المودال عند النقر خارجه
 window.onclick = function(event) {
-  const modal = document.getElementById('imageModal');
+  const modal = document.getElementById("imageModal");
   if (event.target === modal) {
     closeImageModal();
   }
 }
-</script>
+</script>';
 
-<?php
-$page_content = ob_get_clean();
-
-// إدراج القالب
+// Incluir la plantilla
 include __DIR__ . '/includes/layout.php';
 ?>
