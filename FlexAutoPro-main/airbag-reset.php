@@ -1,18 +1,4 @@
 
-معالجة الرموز الخاصة بشكل صحيح
-تجنب ظهور شفرة PHP كنص عادي
-التطبيق:
-استبدل كامل ملف airbag-reset.php بالكود الجديد
-تأكد من وجود ملف search_airbag_ecus.php في نفس المجلد (يتم إنشاؤه تلقائيًا إذا لم يوجد)
-بهذه الطريقة، ستختفي رسائل htmlspecialchars من حقول البحث وستظهر القيم المدخلة بشكل صحيح.
-
-
-
-
-Retry
-
-
-
 <?php
 // Importante: Iniciar buffer de salida antes de cualquier otra operación
 ob_start();
@@ -1279,8 +1265,7 @@ if (!empty($error_message)) {
     $message_section .= '<div class="error-message"><i class="fas fa-exclamation-circle"></i> ' . htmlspecialchars($error_message) . '</div>';
 }
 
-// هنا نبدأ في بناء محتوى الصفحة، لكن بدلاً من استخدام HEREDOC سنستخدم echo مباشرة
-// سنبدأ ببناء الصفحة باستخدام echo
+// هنا نبدأ في بناء محتوى الصفحة
 echo '<div class="main-container">';
 echo '<h1>' . $display_title . '</h1>';
 
@@ -1296,7 +1281,7 @@ echo '<input type="hidden" name="search" value="1">';
 echo '<div class="form-group">';
 echo '<label for="brand">العلامة التجارية</label>';
 echo '<div class="autocomplete-container">';
-echo '<input type="text" id="brand" name="brand" class="form-control" value="' . $safe_selected_brand . '" placeholder="أدخل العلامة التجارية...">';
+echo '<input type="text" id="brand" name="brand" class="form-control" value="'. $safe_selected_brand .'" placeholder="أدخل العلامة التجارية...">';
 echo '<div id="brand-results" class="autocomplete-results"></div>';
 echo '</div>';
 echo '</div>';
@@ -1304,7 +1289,7 @@ echo '</div>';
 echo '<div class="form-group">';
 echo '<label for="model">الموديل</label>';
 echo '<div class="autocomplete-container">';
-echo '<input type="text" id="model" name="model" class="form-control" value="' . $safe_selected_model . '" placeholder="أدخل الموديل...">';
+echo '<input type="text" id="model" name="model" class="form-control" value="'. $safe_selected_model .'" placeholder="أدخل الموديل...">';
 echo '<div id="model-results" class="autocomplete-results"></div>';
 echo '</div>';
 echo '</div>';
@@ -1312,14 +1297,14 @@ echo '</div>';
 echo '<div class="form-group">';
 echo '<label for="ecu">رقم كمبيوتر الإيرباق</label>';
 echo '<div class="autocomplete-container">';
-echo '<input type="text" id="ecu" name="ecu" class="form-control" value="' . $safe_selected_ecu . '" placeholder="أدخل رقم كمبيوتر الإيرباق...">';
+echo '<input type="text" id="ecu" name="ecu" class="form-control" value="'. $safe_selected_ecu .'" placeholder="أدخل رقم كمبيوتر الإيرباق...">';
 echo '<div id="ecu-results" class="autocomplete-results"></div>';
 echo '</div>';
 echo '</div>';
 
 echo '<div class="form-group full-width">';
 echo '<label for="query">بحث عام (العلامة التجارية، الموديل، الرقم، نوع EEPROM)</label>';
-echo '<input type="text" id="query" name="query" class="form-control" value="' . $safe_query . '" placeholder="أدخل كلمات البحث...">';
+echo '<input type="text" id="query" name="query" class="form-control" value="'. $safe_query .'" placeholder="أدخل كلمات البحث...">';
 echo '</div>';
 
 echo '<div class="search-actions full-width">';
