@@ -1,3 +1,18 @@
+
+معالجة الرموز الخاصة بشكل صحيح
+تجنب ظهور شفرة PHP كنص عادي
+التطبيق:
+استبدل كامل ملف airbag-reset.php بالكود الجديد
+تأكد من وجود ملف search_airbag_ecus.php في نفس المجلد (يتم إنشاؤه تلقائيًا إذا لم يوجد)
+بهذه الطريقة، ستختفي رسائل htmlspecialchars من حقول البحث وستظهر القيم المدخلة بشكل صحيح.
+
+
+
+
+Retry
+
+
+
 <?php
 // Importante: Iniciar buffer de salida antes de cualquier otra operación
 ob_start();
@@ -380,7 +395,7 @@ if ($has_result && !empty($ecu_data)) {
     }
 }
 
-// Limpiar valores para evitar problemas con HEREDOC
+// Escapar variables para uso en HTML
 $safe_selected_brand = htmlspecialchars($selected_brand);
 $safe_selected_model = htmlspecialchars($selected_model);
 $safe_selected_ecu = htmlspecialchars($selected_ecu);
@@ -1264,68 +1279,65 @@ if (!empty($error_message)) {
     $message_section .= '<div class="error-message"><i class="fas fa-exclamation-circle"></i> ' . htmlspecialchars($error_message) . '</div>';
 }
 
-// Contenido de la página - CORREGIDO para mostrar correctamente los valores en los campos
-$page_content = <<<HTML
-<div class="main-container">
-  <h1>{$display_title}</h1>
-  
-  <!-- Mensajes de éxito/error -->
-   {$message_section}
+// هنا نبدأ في بناء محتوى الصفحة، لكن بدلاً من استخدام HEREDOC سنستخدم echo مباشرة
+// سنبدأ ببناء الصفحة باستخدام echo
+echo '<div class="main-container">';
+echo '<h1>' . $display_title . '</h1>';
 
-  
-  <!-- Sección de búsqueda --> 
-  <div class="search-container">
-    <h2 class="search-title">🔍 ابحث عن بيانات إعادة ضبط الإيرباق</h2>
-    
-    <form method="GET" action="" class="search-form">
-      <input type="hidden" name="search" value="1">
-      
-      <div class="form-group">
-        <label for="brand">العلامة التجارية</label>
-        <div class="autocomplete-container">
-          <input type="text" id="brand" name="brand" class="form-control" value="{$safe_selected_brand}" placeholder="أدخل العلامة التجارية...">
-          <div id="brand-results" class="autocomplete-results"></div>
-        </div>
-      </div>
-      
-      <div class="form-group">
-        <label for="model">الموديل</label>
-        <div class="autocomplete-container">
-          <input type="text" id="model" name="model" class="form-control" value="{$safe_selected_model}" placeholder="أدخل الموديل...">
-          <div id="model-results" class="autocomplete-results"></div>
-        </div>
-      </div>
-      
-      <div class="form-group">
-        <label for="ecu">رقم كمبيوتر الإيرباق</label>
-        <div class="autocomplete-container">
-          <input type="text" id="ecu" name="ecu" class="form-control" value="{$safe_selected_ecu}" placeholder="أدخل رقم كمبيوتر الإيرباق...">
-          <div id="ecu-results" class="autocomplete-results"></div>
-        </div>
-      </div>
-      
-      <div class="form-group full-width">
-        <label for="query">بحث عام (العلامة التجارية، الموديل، الرقم، نوع EEPROM)</label>
-        <input type="text" id="query" name="query" class="form-control" value="{$safe_query}" placeholder="أدخل كلمات البحث...">
-      </div>
-      
-      <div class="search-actions full-width">
-        <button type="submit" class="btn btn-primary">🔍 بحث</button>
-        <a href="airbag-reset.php" class="btn btn-secondary">↺ إعادة تعيين</a>
-      </div>
-    </form>
-  </div>
-HTML;
+// Mensajes de éxito/error
+echo $message_section;
+
+// Sección de búsqueda
+echo '<div class="search-container">';
+echo '<h2 class="search-title">🔍 ابحث عن بيانات إعادة ضبط الإيرباق</h2>';
+echo '<form method="GET" action="" class="search-form">';
+echo '<input type="hidden" name="search" value="1">';
+
+echo '<div class="form-group">';
+echo '<label for="brand">العلامة التجارية</label>';
+echo '<div class="autocomplete-container">';
+echo '<input type="text" id="brand" name="brand" class="form-control" value="' . $safe_selected_brand . '" placeholder="أدخل العلامة التجارية...">';
+echo '<div id="brand-results" class="autocomplete-results"></div>';
+echo '</div>';
+echo '</div>';
+
+echo '<div class="form-group">';
+echo '<label for="model">الموديل</label>';
+echo '<div class="autocomplete-container">';
+echo '<input type="text" id="model" name="model" class="form-control" value="' . $safe_selected_model . '" placeholder="أدخل الموديل...">';
+echo '<div id="model-results" class="autocomplete-results"></div>';
+echo '</div>';
+echo '</div>';
+
+echo '<div class="form-group">';
+echo '<label for="ecu">رقم كمبيوتر الإيرباق</label>';
+echo '<div class="autocomplete-container">';
+echo '<input type="text" id="ecu" name="ecu" class="form-control" value="' . $safe_selected_ecu . '" placeholder="أدخل رقم كمبيوتر الإيرباق...">';
+echo '<div id="ecu-results" class="autocomplete-results"></div>';
+echo '</div>';
+echo '</div>';
+
+echo '<div class="form-group full-width">';
+echo '<label for="query">بحث عام (العلامة التجارية، الموديل، الرقم، نوع EEPROM)</label>';
+echo '<input type="text" id="query" name="query" class="form-control" value="' . $safe_query . '" placeholder="أدخل كلمات البحث...">';
+echo '</div>';
+
+echo '<div class="search-actions full-width">';
+echo '<button type="submit" class="btn btn-primary">🔍 بحث</button>';
+echo '<a href="airbag-reset.php" class="btn btn-secondary">↺ إعادة تعيين</a>';
+echo '</div>';
+echo '</form>';
+echo '</div>';
 
 // Mensaje de búsqueda
 if (!empty($search_message)) {
-    $page_content .= '<div class="alert alert-info">' . htmlspecialchars($search_message) . '</div>';
+    echo '<div class="alert alert-info">' . htmlspecialchars($search_message) . '</div>';
     
     if (isset($search_results) && count($search_results) > 0) {
-        $page_content .= '<div class="search-results"><table><thead><tr><th>العلامة التجارية</th><th>الموديل</th><th>رقم الكمبيوتر</th><th>نوع EEPROM</th><th>الإجراء</th></tr></thead><tbody>';
+        echo '<div class="search-results"><table><thead><tr><th>العلامة التجارية</th><th>الموديل</th><th>رقم الكمبيوتر</th><th>نوع EEPROM</th><th>الإجراء</th></tr></thead><tbody>';
         
         foreach ($search_results as $result) {
-            $page_content .= '<tr>
+            echo '<tr>
                 <td>' . htmlspecialchars($result['brand']) . '</td>
                 <td>' . htmlspecialchars($result['model']) . '</td>
                 <td>' . htmlspecialchars($result['ecu_number']) . '</td>
@@ -1334,18 +1346,18 @@ if (!empty($search_message)) {
             </tr>';
         }
         
-        $page_content .= '</tbody></table>';
+        echo '</tbody></table>';
         
         // Añadir paginación si hay múltiples páginas
         if (isset($total_pages) && $total_pages > 1) {
-            $page_content .= '<div class="pagination">';
+            echo '<div class="pagination">';
             
             // Previous page link
             if ($page > 1) {
                 $prev_params = $_GET;
                 $prev_params['page'] = $page - 1;
                 $prev_url = 'airbag-reset.php?' . http_build_query($prev_params);
-                $page_content .= '<a href="' . $prev_url . '">&laquo; السابق</a>';
+                echo '<a href="' . $prev_url . '">&laquo; السابق</a>';
             }
             
             // Page links
@@ -1355,12 +1367,12 @@ if (!empty($search_message)) {
             
             for ($i = $start_page; $i <= $end_page; $i++) {
                 if ($i == $page) {
-                    $page_content .= '<span class="current">' . $i . '</span>';
+                    echo '<span class="current">' . $i . '</span>';
                 } else {
                     $page_params = $_GET;
                     $page_params['page'] = $i;
                     $page_url = 'airbag-reset.php?' . http_build_query($page_params);
-                    $page_content .= '<a href="' . $page_url . '">' . $i . '</a>';
+                    echo '<a href="' . $page_url . '">' . $i . '</a>';
                 }
             }
             
@@ -1369,65 +1381,65 @@ if (!empty($search_message)) {
                 $next_params = $_GET;
                 $next_params['page'] = $page + 1;
                 $next_url = 'airbag-reset.php?' . http_build_query($next_params);
-                $page_content .= '<a href="' . $next_url . '">التالي &raquo;</a>';
+                echo '<a href="' . $next_url . '">التالي &raquo;</a>';
             }
             
-            $page_content .= '</div>';
+            echo '</div>';
         }
         
-        $page_content .= '</div>';
+        echo '</div>';
     }
 }
 
 // Resultados de búsqueda
 if ($has_result && !empty($ecu_data)) {
-    $page_content .= '<div class="result-container">
-      <h2 class="result-title">🚗 بيانات كمبيوتر الإيرباق</h2>
-      
-      <table class="data-table">
-        <tr>
+    echo '<div class="result-container">';
+    echo '<h2 class="result-title">🚗 بيانات كمبيوتر الإيرباق</h2>';
+    
+    echo '<table class="data-table">';
+    echo '<tr>
           <th>العلامة التجارية:</th>
           <td>' . htmlspecialchars($ecu_data['brand']) . '</td>
-        </tr>
-        <tr>
+        </tr>';
+    echo '<tr>
           <th>الموديل:</th>
           <td>' . htmlspecialchars($ecu_data['model']) . '</td>
-        </tr>
-        <tr>
+        </tr>';
+    echo '<tr>
           <th>رقم كمبيوتر الإيرباق:</th>
           <td>' . htmlspecialchars($ecu_data['ecu_number']) . '</td>
         </tr>';
         
     if (!empty($ecu_data['eeprom_type'])) {
-        $page_content .= '<tr>
+        echo '<tr>
           <th>نوع EEPROM:</th>
           <td>' . htmlspecialchars($ecu_data['eeprom_type']) . '</td>
         </tr>';
     }
     
     if (isset($ecu_data['crash_location']) && !empty($ecu_data['crash_location'])) {
-        $page_content .= '<tr>
+        echo '<tr>
           <th>موقع بيانات الحادث:</th>
           <td>' . htmlspecialchars($ecu_data['crash_location']) . '</td>
         </tr>';
     }
     
     if (isset($ecu_data['reset_procedure']) && !empty($ecu_data['reset_procedure'])) {
-        $page_content .= '<tr>
+        echo '<tr>
           <th>إجراءات إعادة الضبط:</th>
           <td>' . nl2br(htmlspecialchars($ecu_data['reset_procedure'])) . '</td>
         </tr>';
     }
     
-    $page_content .= '</table>';
+    echo '</table>';
     
     // Imágenes
     if (isset($ecu_data['images']) && count($ecu_data['images']) > 0) {
-        $page_content .= '<h3 style="color: #00d4ff; margin-top: 20px;">📷 صور مخطط الإيرباق</h3>
-        <div class="image-container">';
+        echo '<h3 style="color: #00d4ff; margin-top: 20px;">📷 صور مخطط الإيرباق</h3>';
+        echo '<div class="image-container">';
         
         foreach ($ecu_data['images'] as $index => $image) {
-            $page_content .= '<div class="ecu-image">
+            echo '<div class="ecu-image">
               <img src="uploads/ecu_images/' . htmlspecialchars($image['filename']) . '" 
                    alt="' . htmlspecialchars($ecu_data['brand'] . ' ' . $ecu_data['model']) . '"
                    onclick="openImageModal(\'uploads/ecu_images/' . htmlspecialchars($image['filename']) . '\')">
@@ -1435,15 +1447,15 @@ if ($has_result && !empty($ecu_data)) {
             </div>';
         }
         
-        $page_content .= '</div>';
+        echo '</div>';
     } else {
-        $page_content .= '<div class="alert alert-warning">
+        echo '<div class="alert alert-warning">
           لا توجد صور متاحة لهذا الكمبيوتر
         </div>';
     }
     
     // Instrucciones - MODIFICADO para usar el texto en árabe que proporciona información al cliente
-    $page_content .= '<div class="instructions">
+    echo '<div class="instructions">
         <h3 style="color: #00d4ff;">📋 ماذا يحدث بعد الرفع</h3>
         <ol>
           <li>يتم استلام ملف الدامب المرفوع (EEPROM / Flash / CPU) من قبل فريقنا التقني.</li>
@@ -1454,9 +1466,9 @@ if ($has_result && !empty($ecu_data)) {
           <li>يمكنك تتبع حالة طلبك من صفحة "تذاكري".</li>
           <li>🛡️ تأكد دائمًا من التحقق من تنسيق الملف قبل الإرسال.</li>
         </ol>
-      </div>
-      
-      <div class="info-box">
+      </div>';
+    
+    echo '<div class="info-box">
         <h3>🛠️ ملاحظة فنية</h3>
         <p>
           تأكد دائمًا من مقارنة رقم كمبيوتر الإيرباق الخاص بك مع الرقم المعروض. 
@@ -1467,7 +1479,7 @@ if ($has_result && !empty($ecu_data)) {
     
     // Solicitudes previas
     if (!empty($user_dump_requests)) {
-        $page_content .= '<div class="previous-uploads">
+        echo '<div class="previous-uploads">
           <h3 class="previous-uploads-title">📄 طلباتك السابقة لهذا الكمبيوتر</h3>
           <table class="previous-uploads-table">
             <thead>
@@ -1503,7 +1515,7 @@ if ($has_result && !empty($ecu_data)) {
                 default: $dump_type_text = htmlspecialchars($request['dump_type']);
             }
             
-            $page_content .= '<tr>
+            echo '<tr>
                 <td>' . date('Y/m/d H:i', strtotime($request['upload_date'])) . '</td>
                 <td>' . $dump_type_text . '</td>
                 <td>' . htmlspecialchars($request['original_filename']) . '</td>
@@ -1511,7 +1523,7 @@ if ($has_result && !empty($ecu_data)) {
               </tr>';
         }
             
-        $page_content .= '</tbody>
+        echo '</tbody>
           </table>
           <div style="text-align: center; margin-top: 15px;">
             <a href="includes/my_tickets.php" class="btn btn-primary">
@@ -1522,7 +1534,7 @@ if ($has_result && !empty($ecu_data)) {
     }
     
     // Formulario de carga mejorado
-    $page_content .= '<div class="upload-form">
+    echo '<div class="upload-form">
         <h3 class="upload-title">📤 تحميل ملف الدامب لإعادة ضبط الإيرباق</h3>
         
         <form method="POST" enctype="multipart/form-data" id="upload-form">
@@ -1599,7 +1611,7 @@ if ($has_result && !empty($ecu_data)) {
     </div>';
 } elseif (!isset($search_results) || count($search_results) === 0) {
     // Información predeterminada
-    $page_content .= '<div class="info-box">
+    echo '<div class="info-box">
       <h3>👋 مرحبًا بك في نظام مسح وإعادة ضبط الإيرباق</h3>
       <p>
         استخدم نموذج البحث أعلاه للعثور على معلومات حول كمبيوتر الإيرباق الخاص بسيارتك.
@@ -1618,13 +1630,13 @@ if ($has_result && !empty($ecu_data)) {
 }
 
 // Botón de regreso
-$page_content .= '<a href="home.php" class="back-link">
+echo '<a href="home.php" class="back-link">
     ↩️ العودة إلى الصفحة الرئيسية
   </a>
 </div>';
 
 // Modal de imágenes mejorado
-$page_content .= '<div id="imageModal" class="modal">
+echo '<div id="imageModal" class="modal">
   <div class="modal-content">
     <span class="close" onclick="closeImageModal()">&times;</span>
     <img id="modalImage" src="" alt="صورة الإيرباق" style="width: 100%; height: auto;">
@@ -1632,7 +1644,8 @@ $page_content .= '<div id="imageModal" class="modal">
 </div>';
 
 // JavaScript mejorado
-$page_content .= '<script>
+?>
+<script>
 document.addEventListener("DOMContentLoaded", function() {
     // Drag and drop file upload
     const dropArea = document.getElementById("drop-area");
@@ -2038,8 +2051,9 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     });
 });
-</script>';
+</script>
 
+<?php
 // Crear search_airbag_ecus.php para AJAX if it doesn't exist
 $ajax_handler_path = __DIR__ . '/search_airbag_ecus.php';
 if (!file_exists($ajax_handler_path)) {
@@ -2152,4 +2166,3 @@ try {
 
 // Incluir plantilla
 include __DIR__ . '/includes/layout.php';
-?>
