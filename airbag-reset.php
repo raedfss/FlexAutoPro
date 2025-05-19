@@ -10,6 +10,9 @@
  * @copyright   2025 FlexAutoPro
  */
 
+// مهم جدًا: تأكد من عدم وجود مسافات أو أحرف قبل علامة <?php الافتتاحية
+
+// تهيئة الجلسة قبل أي مخرجات
 session_start();
 require_once __DIR__ . '/includes/db.php';
 
@@ -37,6 +40,7 @@ $selected_ecu = $_GET['ecu'] ?? '';
 $ecu_data = null;
 $has_result = false;
 $search_message = '';
+$search_results = [];
 
 // معالجة البحث المباشر
 if (!empty($_GET['ecu_id'])) {
@@ -148,24 +152,28 @@ $brands = $pdo->query("SELECT DISTINCT brand FROM airbag_ecus ORDER BY brand")->
 // إضافة تسجيل للبحث (إذا كنت تريد تتبع عمليات البحث)
 if ($has_result && !empty($ecu_data)) {
     try {
-        $log_stmt = $pdo->prepare("
-            INSERT INTO search_logs (user_id, ecu_id, brand, model, ecu_number, search_term, ip_address)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ");
-        
-        $user_id = $_SESSION['user_id'] ?? 0;
-        $ip_address = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
-        $search_term = $query ?: "$selected_brand $selected_model $selected_ecu";
-        
-        $log_stmt->execute([
-            $user_id,
-            $ecu_data['id'],
-            $ecu_data['brand'],
-            $ecu_data['model'],
-            $ecu_data['ecu_number'],
-            $search_term,
-            $ip_address
-        ]);
+        // تحقق من وجود جدول السجلات أولاً
+        $check_table = $pdo->query("SHOW TABLES LIKE 'search_logs'");
+        if ($check_table->rowCount() > 0) {
+            $log_stmt = $pdo->prepare("
+                INSERT INTO search_logs (user_id, ecu_id, brand, model, ecu_number, search_term, ip_address)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ");
+            
+            $user_id = $_SESSION['user_id'] ?? 0;
+            $ip_address = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            $search_term = $query ?: "$selected_brand $selected_model $selected_ecu";
+            
+            $log_stmt->execute([
+                $user_id,
+                $ecu_data['id'],
+                $ecu_data['brand'],
+                $ecu_data['model'],
+                $ecu_data['ecu_number'],
+                $search_term,
+                $ip_address
+            ]);
+        }
     } catch (Exception $e) {
         // لا نقوم بعرض أخطاء السجل للمستخدم
         error_log('Error logging search: ' . $e->getMessage());
@@ -650,13 +658,13 @@ ob_start();
           <td><?= htmlspecialchars($ecu_data['eeprom_type']) ?></td>
         </tr>
         <?php endif; ?>
-        <?php if (!empty($ecu_data['crash_location'])): ?>
+        <?php if (isset($ecu_data['crash_location']) && !empty($ecu_data['crash_location'])): ?>
         <tr>
           <th>موقع بيانات الحادث:</th>
           <td><?= htmlspecialchars($ecu_data['crash_location']) ?></td>
         </tr>
         <?php endif; ?>
-        <?php if (!empty($ecu_data['reset_procedure'])): ?>
+        <?php if (isset($ecu_data['reset_procedure']) && !empty($ecu_data['reset_procedure'])): ?>
         <tr>
           <th>إجراءات إعادة الضبط:</th>
           <td><?= nl2br(htmlspecialchars($ecu_data['reset_procedure'])) ?></td>
@@ -672,7 +680,7 @@ ob_start();
               <img src="uploads/ecu_images/<?= htmlspecialchars($image['filename']) ?>" 
                    alt="<?= htmlspecialchars($ecu_data['brand'] . ' ' . $ecu_data['model']) ?>"
                    onclick="openImageModal('uploads/ecu_images/<?= htmlspecialchars($image['filename']) ?>')">
-              <?php if (!empty($image['description'])): ?>
+              <?php if (isset($image['description']) && !empty($image['description'])): ?>
                 <div class="image-caption"><?= htmlspecialchars($image['description']) ?></div>
               <?php endif; ?>
             </div>
