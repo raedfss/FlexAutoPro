@@ -379,7 +379,7 @@ if (!empty($search_message)) {
                 <td>' . htmlspecialchars($result['brand']) . '</td>
                 <td>' . htmlspecialchars($result['model']) . '</td>
                 <td>' . htmlspecialchars($result['ecu_number']) . '</td>
-                <td>' . htmlspecialchars($result['eeprom_type'] ?? 'غير متوفر') . '</td>
+                <td>' . htmlspecialchars(isset($result['eeprom_type']) ? $result['eeprom_type'] : 'غير متوفر') . '</td>
                 <td><a href="airbag-reset.php?ecu_id=' . $result['id'] . '" class="result-link">عرض التفاصيل</a></td>
             </tr>';
         }
