@@ -380,6 +380,12 @@ if ($has_result && !empty($ecu_data)) {
     }
 }
 
+// Limpiar valores para evitar problemas con HEREDOC
+$safe_selected_brand = htmlspecialchars($selected_brand);
+$safe_selected_model = htmlspecialchars($selected_model);
+$safe_selected_ecu = htmlspecialchars($selected_ecu);
+$safe_query = htmlspecialchars($query);
+
 // CSS mejorado
 $page_css = '
 .main-container {
@@ -1249,7 +1255,7 @@ $page_css = '
     }
 }';
 
-// rسائل النجاح / الخطأ لتضمينها داخل الصفحة
+// رسائل النجاح / الخطأ لتضمينها داخل الصفحة
 $message_section = '';
 if (!empty($success_message)) {
     $message_section .= '<div class="success-message"><i class="fas fa-check-circle"></i> ' . htmlspecialchars($success_message) . '</div>';
@@ -1258,7 +1264,7 @@ if (!empty($error_message)) {
     $message_section .= '<div class="error-message"><i class="fas fa-exclamation-circle"></i> ' . htmlspecialchars($error_message) . '</div>';
 }
 
-// Contenido de la página
+// Contenido de la página - CORREGIDO para mostrar correctamente los valores en los campos
 $page_content = <<<HTML
 <div class="main-container">
   <h1>{$display_title}</h1>
@@ -1277,7 +1283,7 @@ $page_content = <<<HTML
       <div class="form-group">
         <label for="brand">العلامة التجارية</label>
         <div class="autocomplete-container">
-          <input type="text" id="brand" name="brand" class="form-control" value="{$selected_brand}" placeholder="أدخل العلامة التجارية...">
+          <input type="text" id="brand" name="brand" class="form-control" value="{$safe_selected_brand}" placeholder="أدخل العلامة التجارية...">
           <div id="brand-results" class="autocomplete-results"></div>
         </div>
       </div>
@@ -1285,7 +1291,7 @@ $page_content = <<<HTML
       <div class="form-group">
         <label for="model">الموديل</label>
         <div class="autocomplete-container">
-          <input type="text" id="model" name="model" class="form-control" value="{$selected_model}" placeholder="أدخل الموديل...">
+          <input type="text" id="model" name="model" class="form-control" value="{$safe_selected_model}" placeholder="أدخل الموديل...">
           <div id="model-results" class="autocomplete-results"></div>
         </div>
       </div>
@@ -1293,14 +1299,14 @@ $page_content = <<<HTML
       <div class="form-group">
         <label for="ecu">رقم كمبيوتر الإيرباق</label>
         <div class="autocomplete-container">
-          <input type="text" id="ecu" name="ecu" class="form-control" value="{$selected_ecu}" placeholder="أدخل رقم كمبيوتر الإيرباق...">
+          <input type="text" id="ecu" name="ecu" class="form-control" value="{$safe_selected_ecu}" placeholder="أدخل رقم كمبيوتر الإيرباق...">
           <div id="ecu-results" class="autocomplete-results"></div>
         </div>
       </div>
       
       <div class="form-group full-width">
         <label for="query">بحث عام (العلامة التجارية، الموديل، الرقم، نوع EEPROM)</label>
-        <input type="text" id="query" name="query" class="form-control" value="{$query}" placeholder="أدخل كلمات البحث...">
+        <input type="text" id="query" name="query" class="form-control" value="{$safe_query}" placeholder="أدخل كلمات البحث...">
       </div>
       
       <div class="search-actions full-width">
@@ -2146,4 +2152,4 @@ try {
 
 // Incluir plantilla
 include __DIR__ . '/includes/layout.php';
-?
+?>
