@@ -12,7 +12,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $confirm_password = trim($_POST['confirm_password']);
     
     // استبدال FILTER_SANITIZE_STRING بـ htmlspecialchars
-    $fullname = isset($_POST['fullname']) ? htmlspecialchars(trim($_POST['fullname']), ENT_QUOTES, 'UTF-8') : '';
+    $fname = isset($_POST['fullname']) ? htmlspecialchars(trim($_POST['fullname']), ENT_QUOTES, 'UTF-8') : '';
+    $flname = isset($_POST['fullname']) ? htmlspecialchars(trim($_POST['fullname']), ENT_QUOTES, 'UTF-8') : '';
+    $fullname = $fname . $flname
     $phone = isset($_POST['phone']) ? htmlspecialchars(trim($_POST['phone']), ENT_QUOTES, 'UTF-8') : '';
     $username = htmlspecialchars(explode('@', $email)[0], ENT_QUOTES, 'UTF-8');
 
@@ -233,7 +235,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                maxlength="150" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
         
         <input type="text" name="fullname" placeholder="الاسم الكامل *" required
-               maxlength="150" value="<?php echo isset($_POST['fullname']) ? htmlspecialchars($_POST['fullname']) : ''; ?>">
+               maxlength="150" value="<?php echo isset($_POST['lname']) ? htmlspecialchars($_POST['fname']) : ''; ?>">
+        <input type="text" name="fullname" placeholder="الاسم الكامل *" required
+               maxlength="150" value="<?php echo isset($_POST['fname']) ? htmlspecialchars($_POST['lname']) : ''; ?>">
         
         <input type="tel" name="phone" placeholder="رقم الهاتف (اختياري)"
                pattern="[0-9+\-\s]{8,15}" title="يرجى إدخال رقم هاتف صحيح"
