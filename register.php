@@ -154,7 +154,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             box-sizing: border-box;
         }
         .login-box input[type="submit"] {
-            background-color: #1e90ff;
+            background-color:rgb(255, 30, 30);
             color: white;
             cursor: pointer;
             margin-top: 20px;
