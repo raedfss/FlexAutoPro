@@ -16,6 +16,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $phone = isset($_POST['phone']) ? htmlspecialchars(trim($_POST['phone']), ENT_QUOTES, 'UTF-8') : '';
     $email_parts = explode('@', $email); // استخراج الجزء الأول من البريد
     $username = htmlspecialchars($email_parts[0], ENT_QUOTES, 'UTF-8'); // استخدام الجزء الأول بعد تعقيمه
+    // تعديل وهمي لإجبار Render على البناء
+
+    // تعديل وهمي لإجبار Render على البناء
 
 
     if ($password !== $confirm_password) {
