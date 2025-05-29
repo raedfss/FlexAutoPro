@@ -549,7 +549,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
          =============================== -->
     
     <header>
-        <i class="fas fa-car"></i>
         FlexAuto - نظام ورشة السيارات الذكي
     </header>
 
@@ -560,7 +559,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     <div class="register-container">
         <div class="register-box">
             <h2>
-                <i class="fas fa-user-plus"></i>
                 تسجيل مستخدم جديد
             </h2>
             
@@ -571,7 +569,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <!-- البريد الإلكتروني -->
                 <div class="form-group">
                     <label for="email">
-                        <i class="fas fa-envelope"></i>
                         البريد الإلكتروني <span class="required">*</span>
                     </label>
                     <input type="email" name="email" id="email" 
@@ -586,7 +583,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <!-- الاسم الأول -->
                     <div class="form-group">
                         <label for="first_name">
-                            <i class="fas fa-user"></i>
                             الاسم الأول <span class="required">*</span>
                         </label>
                         <input type="text" name="first_name" id="first_name" 
@@ -599,7 +595,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <!-- الاسم الأوسط -->
                     <div class="form-group">
                         <label for="middle_name">
-                            <i class="fas fa-user"></i>
                             الاسم الأوسط <span class="optional">(اختياري)</span>
                         </label>
                         <input type="text" name="middle_name" id="middle_name" 
@@ -615,7 +610,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <!-- اسم العائلة -->
                     <div class="form-group">
                         <label for="last_name">
-                            <i class="fas fa-users"></i>
                             اسم العائلة <span class="required">*</span>
                         </label>
                         <input type="text" name="last_name" id="last_name" 
@@ -628,7 +622,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                     <!-- اسم الشهرة -->
                     <div class="form-group">
                         <label for="nickname">
-                            <i class="fas fa-tag"></i>
                             اسم الشهرة <span class="optional">(اختياري)</span>
                         </label>
                         <input type="text" name="nickname" id="nickname" 
@@ -642,7 +635,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <!-- رقم الهاتف -->
                 <div class="form-group">
                     <label for="phone">
-                        <i class="fas fa-phone"></i>
                         رقم الهاتف <span class="optional">(اختياري)</span>
                     </label>
                     <input type="tel" name="phone" id="phone" 
@@ -657,7 +649,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <!-- كلمة المرور -->
                 <div class="form-group">
                     <label for="password">
-                        <i class="fas fa-lock"></i>
                         كلمة المرور <span class="required">*</span>
                     </label>
                     <input type="password" name="password" id="password" 
@@ -665,7 +656,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                            minlength="8" maxlength="255"
                            autocomplete="new-password">
                     <div class="password-requirements">
-                        <i class="fas fa-info-circle"></i>
                         يجب أن تحتوي كلمة المرور على 8 أحرف على الأقل لضمان الأمان
                     </div>
                 </div>
@@ -673,7 +663,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 <!-- تأكيد كلمة المرور -->
                 <div class="form-group">
                     <label for="confirm_password">
-                        <i class="fas fa-lock"></i>
                         تأكيد كلمة المرور <span class="required">*</span>
                     </label>
                     <input type="password" name="confirm_password" id="confirm_password" 
@@ -684,7 +673,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 
                 <!-- زر التسجيل -->
                 <button type="submit" class="submit-btn">
-                    <i class="fas fa-user-plus"></i>
                     إنشاء الحساب
                 </button>
             </form>
@@ -692,22 +680,18 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             <!-- عرض رسائل الخطأ والنجاح -->
             <?php if (!empty($register_error)): ?>
                 <div class="error">
-                    <i class="fas fa-exclamation-triangle"></i>
                     <?php echo $register_error; ?>
                 </div>
             <?php elseif (!empty($register_success)): ?>
                 <div class="success">
-                    <i class="fas fa-check-circle"></i>
                     <?php echo htmlspecialchars($register_success); ?>
                 </div>
             <?php endif; ?>
 
             <!-- روابط إضافية -->
             <div class="extra-links">
-                <i class="fas fa-question-circle"></i>
                 لديك حساب بالفعل؟ 
                 <a href="login.php">
-                    <i class="fas fa-sign-in-alt"></i>
                     سجِّل الدخول
                 </a>
             </div>
@@ -720,21 +704,16 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     
     <footer>
         <div class="footer-highlight">
-            <i class="fas fa-star"></i>
             ذكاءٌ في الخدمة، سرعةٌ في الاستجابة، جودةٌ بلا حدود
-            <i class="fas fa-star"></i>
         </div>
         <div>
-            <i class="fas fa-globe"></i>
             Smart service, fast response, unlimited quality
         </div>
         <div style="margin-top: 10px;">
-            <i class="fas fa-envelope"></i> contact@flexauto.com | 
-            <i class="fas fa-phone"></i> +962796519007
+            📧 contact@flexauto.com | ☎️ +962796519007
         </div>
         <div style="margin-top: 8px;">
-            <i class="fas fa-copyright"></i>
-            <?php echo date('Y'); ?> FlexAuto. جميع الحقوق محفوظة.
+            &copy; <?php echo date('Y'); ?> FlexAuto. جميع الحقوق محفوظة.
         </div>
     </footer>
 
@@ -822,7 +801,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             // إنشاء عنصر رسالة خطأ جديد
             const errorDiv = document.createElement('div');
             errorDiv.className = 'error client-error';
-            errorDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> ' + message;
+            errorDiv.innerHTML = message;
             
             // إدراج رسالة الخطأ بعد النموذج
             registerForm.insertAdjacentElement('afterend', errorDiv);
