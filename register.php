@@ -14,7 +14,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     // استبدال FILTER_SANITIZE_STRING بـ htmlspecialchars
     $fullname = isset($_POST['fullname']) ? htmlspecialchars(trim($_POST['fullname']), ENT_QUOTES, 'UTF-8') : '';
     $phone = isset($_POST['phone']) ? htmlspecialchars(trim($_POST['phone']), ENT_QUOTES, 'UTF-8') : '';
-    $username = htmlspecialchars(explode('@', $email)[0], ENT_QUOTES, 'UTF-8');
+    $email_parts = explode('@', $email); // استخراج الجزء الأول من البريد
+    $username = htmlspecialchars($email_parts[0], ENT_QUOTES, 'UTF-8'); // استخدام الجزء الأول بعد تعقيمه
+
 
     if ($password !== $confirm_password) {
         $register_error = "❌ كلمتا المرور غير متطابقتين.";
